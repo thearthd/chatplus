@@ -944,14 +944,7 @@ function stopParticipantsListener() {
   // ── JOIN / LEAVE ──
 // --- updated joinRoom --- (only the joining/participant doc parts replaced)
 async function joinRoom(id, name) {
-  if (!localStream) {
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    } catch(e) {
-      showToast('Camera/mic access denied', '❌');
-      return;
-    }
-  }
+
   roomId = id;
   roomName = name || id;
   topbarRoomId.textContent = roomId;
