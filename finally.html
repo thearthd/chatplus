@@ -1,0 +1,1284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Rooms — Video Call</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --border: #2a2a38;
+      --border2: #3a3a4e;
+      --text: #e8e8f0;
+      --muted: #6b6b82;
+      --accent: #5b5fff;
+      --accent-glow: rgba(91,95,255,0.25);
+      --red: #ff4f4f;
+      --green: #3ddc84;
+      --yellow: #ffb830;
+      --radius: 12px;
+      --font: 'DM Sans', sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow-x: hidden; }
+
+    /* ── SCREENS ── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── HOME SCREEN ── */
+    #homeScreen {
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 60px;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(91,95,255,0.15) 0%, transparent 70%), var(--bg);
+    }
+
+    .home-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 24px var(--accent-glow);
+    }
+    .logo-icon svg { width: 22px; height: 22px; fill: #fff; }
+    .logo-text { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+    .tagline { color: var(--muted); font-size: 15px; }
+
+    .home-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 8px;
+      font-family: var(--font); font-size: 14px; font-weight: 500;
+      border: none; cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn svg { width: 16px; height: 16px; }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 20px var(--accent-glow); }
+    .btn-primary:hover { background: #6c70ff; box-shadow: 0 0 28px var(--accent-glow); }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--border2); background: #222230; }
+    .btn-danger { background: rgba(255,79,79,0.12); color: var(--red); border: 1px solid rgba(255,79,79,0.25); }
+    .btn-danger:hover { background: rgba(255,79,79,0.2); }
+    .btn-sm { padding: 7px 14px; font-size: 13px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .join-row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .join-row input {
+      padding: 10px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-family: var(--mono); font-size: 14px;
+      width: 220px; outline: none; transition: border-color 0.15s;
+    }
+    .join-row input:focus { border-color: var(--accent); }
+    .join-row input::placeholder { color: var(--muted); }
+
+    /* ROOMS LIST */
+    .rooms-section { width: 100%; max-width: 700px; }
+    .rooms-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .rooms-title { font-size: 14px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .refresh-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-family: var(--font); font-size: 13px; display: flex; align-items: center; gap: 6px;
+    }
+    .refresh-btn:hover { color: var(--text); }
+    .refresh-btn svg { width: 14px; height: 14px; }
+
+    .rooms-grid {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .room-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: border-color 0.15s, background 0.15s;
+      cursor: default;
+    }
+    .room-card:hover { border-color: var(--border2); background: var(--surface2); }
+    .room-card-left { display: flex; align-items: center; gap: 14px; }
+    .room-avatar {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #a05fff);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 15px; color: #fff; flex-shrink: 0;
+    }
+    .room-info {}
+    .room-name { font-size: 15px; font-weight: 500; margin-bottom: 3px; }
+    .room-meta { font-size: 12px; color: var(--muted); font-family: var(--mono); display: flex; gap: 10px; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); margin-right: 5px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    .empty-state {
+      text-align: center; padding: 48px 20px;
+      color: var(--muted); font-size: 14px;
+      border: 1px dashed var(--border); border-radius: var(--radius);
+    }
+    .empty-state svg { width: 36px; height: 36px; opacity: 0.3; margin-bottom: 12px; display: block; margin: 0 auto 12px; }
+
+    /* ── CALL SCREEN ── */
+    #callScreen {
+      flex-direction: column;
+      background: #06060a;
+    }
+
+    /* TOP BAR */
+    .call-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .call-room-info { display: flex; align-items: center; gap: 10px; }
+    .call-room-badge {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 10px;
+      font-family: var(--mono); font-size: 13px; color: var(--text);
+    }
+    .live-badge {
+      background: rgba(61,220,132,0.12); border: 1px solid rgba(61,220,132,0.3);
+      color: var(--green); border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .call-topbar-right { display: flex; align-items: center; gap: 8px; }
+
+    /* VIDEO GRID */
+    .video-grid-wrap {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 16px; overflow: auto;
+    }
+    .video-grid {
+      display: grid;
+      gap: 10px;
+      width: 100%; height: 100%;
+      max-width: 1400px;
+    }
+    /* dynamic grid columns set by JS */
+
+    .video-tile {
+      background: var(--surface); border-radius: 12px;
+      overflow: hidden; position: relative;
+      border: 1px solid var(--border);
+      aspect-ratio: 4/3;
+    }
+    .video-tile video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .tile-label {
+      position: absolute; bottom: 10px; left: 10px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      border-radius: 6px; padding: 4px 10px;
+      font-size: 12px; font-weight: 500; color: #fff;
+    }
+    .tile-local .tile-label::after { content: ' (You)'; color: var(--accent); }
+
+    /* BOTTOM CONTROLS */
+    .call-controls {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      width: 48px; height: 48px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.15s; color: var(--text);
+      position: relative;
+    }
+    .ctrl-btn svg { width: 20px; height: 20px; }
+    .ctrl-btn:hover { border-color: var(--border2); background: #222230; }
+    .ctrl-btn.off { background: rgba(255,79,79,0.15); border-color: rgba(255,79,79,0.4); color: var(--red); }
+    .ctrl-btn.off:hover { background: rgba(255,79,79,0.25); }
+    .ctrl-end {
+      background: var(--red); border-color: var(--red); color: #fff;
+      width: 56px; height: 48px; border-radius: 12px;
+      box-shadow: 0 0 18px rgba(255,79,79,0.3);
+    }
+    .ctrl-end:hover { background: #ff3535; }
+
+    /* VOLUME POPUP */
+    .vol-popup {
+      display: none; position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+      background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+      padding: 12px; width: 140px; z-index: 10;
+    }
+    .vol-popup input[type=range] { width: 100%; accent-color: var(--accent); }
+    .vol-popup label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; }
+
+    /* DEVICE SELECT in topbar */
+    .dev-select {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; padding: 5px 8px;
+      font-family: var(--font); font-size: 13px; outline: none;
+      cursor: pointer; max-width: 180px;
+    }
+    .dev-select:focus { border-color: var(--accent); }
+
+    /* LOG */
+    .call-log {
+      position: fixed; bottom: 90px; right: 16px;
+      width: 320px; max-height: 160px; overflow: auto;
+      background: rgba(10,10,15,0.92); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px; font-family: var(--mono); font-size: 11px; color: #666;
+      z-index: 100; display: none;
+    }
+    .call-log.show { display: block; }
+
+    /* NOTIFICATION TOAST */
+    .toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-80px);
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 12px 20px;
+      font-size: 14px; color: var(--text); z-index: 999;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      pointer-events: none; white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 200; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 16px; padding: 28px; width: 360px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+    .modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+    .modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    .modal input {
+      width: 100%; padding: 10px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-family: var(--font); font-size: 14px;
+      outline: none; margin-bottom: 16px; transition: border-color 0.15s;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btns .btn { flex: 1; justify-content: center; }
+
+    @media (max-width: 600px) {
+      .call-topbar { flex-wrap: wrap; gap: 8px; }
+      .dev-select { max-width: 130px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HOME SCREEN -->
+<div id="homeScreen" class="screen active">
+  <div class="home-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      </div>
+      <span class="logo-text">Rooms</span>
+    </div>
+    <p class="tagline">Simple, fast video calls — no accounts needed</p>
+  </div>
+
+  <div class="home-actions">
+    <button class="btn btn-primary" id="newRoomBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Room
+    </button>
+    <div class="join-row">
+      <input id="joinInput" type="text" placeholder="Room ID…" spellcheck="false" autocomplete="off" />
+      <button class="btn btn-ghost" id="joinBtn">Join</button>
+    </div>
+  </div>
+
+  <div class="rooms-section">
+    <div class="rooms-header">
+      <span class="rooms-title">Active Rooms</span>
+      <button class="refresh-btn" id="refreshBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div class="rooms-grid" id="roomsGrid">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>
+        Loading rooms…
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CALL SCREEN -->
+<div id="callScreen" class="screen">
+  <div class="call-topbar">
+    <div class="call-room-info">
+      <span class="live-badge"><span class="dot"></span>LIVE</span>
+      <span class="call-room-badge" id="topbarRoomId">—</span>
+      <button class="btn btn-ghost btn-sm" id="copyIdBtn" title="Copy Room ID">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy ID
+      </button>
+    </div>
+    <div class="call-topbar-right">
+      <label style="font-size:12px;color:var(--muted);">Cam</label>
+      <select class="dev-select" id="camSelect" disabled></select>
+      <label style="font-size:12px;color:var(--muted);">Mic</label>
+      <select class="dev-select" id="micSel" disabled></select>
+    </div>
+  </div>
+
+  <div class="video-grid-wrap">
+    <div class="video-grid" id="videoGrid"></div>
+  </div>
+
+  <div class="call-controls">
+    <button class="ctrl-btn" id="micToggle" title="Toggle mic">
+      <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button class="ctrl-btn" id="camToggle" title="Toggle camera">
+      <svg id="camIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+    </button>
+    <div style="position:relative">
+      <button class="ctrl-btn" id="volBtn" title="Speaker volume">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      </button>
+      <div class="vol-popup" id="volPopup">
+        <label>Speaker Volume</label>
+        <input type="range" id="masterVol" min="0" max="2" step="0.01" value="1">
+      </div>
+    </div>
+    <button class="ctrl-btn" id="logToggle" title="Debug log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    </button>
+    <button class="ctrl-btn ctrl-end" id="leaveBtn" title="Leave call">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:22px;height:22px;"><path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27 11.36 11.36 0 003.54.56 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.56 3.54 1 1 0 01-.27 1.11z"/><line x1="23" y1="1" x2="1" y2="23" stroke="#fff" stroke-width="2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Debug log -->
+<div class="call-log" id="callLog"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- New Room Modal -->
+<div class="modal-overlay" id="newRoomModal">
+  <div class="modal">
+    <h3>New Room</h3>
+    <p>Give your room a name so others can find it.</p>
+    <input id="roomNameInput" type="text" placeholder="e.g. Team Standup" maxlength="40" />
+    <div class="modal-btns">
+      <button class="btn btn-ghost" id="cancelNewRoom">Cancel</button>
+      <button class="btn btn-primary" id="confirmNewRoom">Create & Join</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import {
+    getFirestore, collection, doc, setDoc, addDoc, onSnapshot,
+    getDocs, deleteDoc, query, where, serverTimestamp, orderBy, limit, getDoc
+  } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBU0ty5MSCgiJVchNS5_QMZRMhrJuRUqBw",
+    authDomain: "test-ec5f1.firebaseapp.com",
+    projectId: "test-ec5f1",
+    storageBucket: "test-ec5f1.firebasestorage.app",
+    messagingSenderId: "241568634973",
+    appId: "1:241568634973:web:f09ea2709a9ba4dc3ed5b4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ── STATE ──
+  const clientId = makeId(8);
+  let roomId = null, roomName = null;
+  let localStream = null;
+  const peerMap = {};
+  const remoteStreamMap = {};
+  const knownParticipants = new Set();
+  let participantsUnsub = null, signalsUnsub = null, roomsUnsub = null;
+  let isInRoom = false;
+  let micOn = true, camOn = true;
+  let masterVol = 1.0;
+
+// Add/modify near the top of your script (STATE area)
+const HEARTBEAT_INTERVAL_MS = 5000;  // write lastSeen every 5s
+const STALE_TTL_MS = 15000;         // treat participants as stale after 15s
+
+let heartbeatTimer = null;
+let participantsCleanupTimer = null;
+
+  const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+  // ── UI REFS ──
+  const homeScreen = document.getElementById('homeScreen');
+  const callScreen = document.getElementById('callScreen');
+  const roomsGrid = document.getElementById('roomsGrid');
+  const videoGrid = document.getElementById('videoGrid');
+  const topbarRoomId = document.getElementById('topbarRoomId');
+  const camSelect = document.getElementById('camSelect');
+  const micSel = document.getElementById('micSel');
+  const callLog = document.getElementById('callLog');
+  const toast = document.getElementById('toast');
+  const localTileId = 'tile-local';
+
+  // ── HELPERS ──
+  function makeId(n=8){ return Math.random().toString(36).slice(2, 2+n); }
+
+  let toastTimer;
+  function showToast(msg, icon='ℹ️') {
+    toast.innerHTML = icon + ' ' + msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+  
+  // --- start heartbeat for our participant doc ---
+// call this after you've successfully joined and created your participant doc
+function startHeartbeat() {
+  if (!roomId) return;
+  // ensure initial lastSeen
+  setDoc(doc(participantsColl(roomId), clientId), { lastSeen: serverTimestamp() }, { merge: true }).catch(e=>{
+    log('heartbeat init failed: ' + e);
+  });
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (!roomId) return;
+    setDoc(doc(participantsColl(roomId), clientId), { lastSeen: serverTimestamp() }, { merge: true }).catch(e=>{
+      // don't spam logs too much
+      console.warn('heartbeat write failed', e);
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+// stop heartbeat
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+// --- cleanup stale participant docs periodically ---
+// deletes participant docs whose lastSeen is older than STALE_TTL_MS
+async function cleanupStaleParticipants() {
+  if (!roomId) return;
+  try {
+    const snap = await getDocs(participantsColl(roomId));
+    const now = Date.now();
+    for (const d of snap.docs) {
+      if (d.id === clientId) continue;
+      const data = d.data();
+      const lastSeenTs = data?.lastSeen ? data.lastSeen.toMillis() : (data?.joinedAt ? data.joinedAt.toMillis() : 0);
+      if (!lastSeenTs || (now - lastSeenTs) > STALE_TTL_MS) {
+        // try best-effort deletion of stale docs
+        try {
+          await deleteDoc(d.ref);
+          log('Cleaned stale participant doc: ' + d.id);
+        } catch (e) {
+          // deletion can fail (security rules); that's OK, other clients still treat them as stale
+          console.warn('stale delete failed', e);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('cleanupStaleParticipants error', e);
+  }
+}
+
+// --- fix log helper (replace your existing log function) ---
+function log(msg) {
+  const t = new Date().toLocaleTimeString();
+  callLog.textContent = `[${t}] ${msg}\n` + callLog.textContent;
+}
+
+  function showScreen(which) {
+    homeScreen.classList.toggle('active', which === 'home');
+    callScreen.classList.toggle('active', which === 'call');
+  }
+
+// ---------- REPLACEMENT FUNCTIONS (paste into your script) ----------
+
+// Stop and release any existing local stream
+function stopLocalStream() {
+  if (!localStream) return;
+  try {
+    localStream.getTracks().forEach(t => {
+      try { t.stop(); } catch(e){}
+    });
+  } finally {
+    localStream = null;
+    // update UI selects
+    try { camSelect.disabled = true; micSel.disabled = true; } catch(e){}
+  }
+}
+
+// Attempt to acquire a local stream: try video+audio then fallback to video-only
+async function acquireLocalStream({ preferAudio = true } = {}) {
+  // always stop previous first
+  stopLocalStream();
+
+  // small helper to show a toast/hint
+  function uiHint(msg) {
+    try { showToast(msg, 'ℹ️'); } catch(e) { console.warn(msg); }
+  }
+
+  // Try combined request first (best UX)
+  if (preferAudio) {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream = s;
+      uiHint('Camera + microphone allowed');
+      return s;
+    } catch (err) {
+      console.warn('combined gUM failed', err?.name, err?.message);
+      // If microphone permission is the blocker, fall back to video-only
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+        try {
+          const s2 = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          localStream = s2;
+          uiHint('Camera allowed (microphone blocked). You can enable mic in site settings.');
+          return s2;
+        } catch (err2) {
+          console.error('video-only fallback failed', err2);
+          throw err2;
+        }
+      }
+      // Other errors (NotFoundError etc) -> rethrow
+      throw err;
+    }
+  } else {
+    // preferAudio false -> request video-only
+    const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    localStream = s;
+    uiHint('Camera allowed (requested video-only)');
+    return s;
+  }
+}
+
+// Populate the device selects. Note: device labels only appear after the page has permission.
+async function populateDevices() {
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const cams = devs.filter(d => d.kind === 'videoinput');
+    const mics = devs.filter(d => d.kind === 'audioinput');
+
+    camSelect.innerHTML = cams.map((c,i)=>`<option value="${c.deviceId}">${c.label||'Camera '+(i+1)}</option>`).join('');
+    micSel.innerHTML = mics.map((m,i)=>`<option value="${m.deviceId}">${m.label||'Mic '+(i+1)}</option>`).join('');
+
+    camSelect.disabled = cams.length === 0;
+    micSel.disabled = mics.length === 0;
+
+    // If we have a localStream, set selects to current device ids (if available)
+    if (localStream) {
+      const vt = localStream.getVideoTracks()[0];
+      const at = localStream.getAudioTracks()[0];
+      try {
+        if (vt && vt.getSettings) camSelect.value = vt.getSettings().deviceId || '';
+      } catch(e){}
+      try {
+        if (at && at.getSettings) micSel.value = at.getSettings().deviceId || '';
+      } catch(e){}
+    }
+  } catch(e) {
+    console.warn('populateDevices failed', e);
+  }
+}
+
+async function _applyTracksToPeers(newStream) {
+  for (const rid of Object.keys(peerMap)) {
+    try {
+      const pc = peerMap[rid].pc;
+      // Replace video sender
+      const nv = newStream.getVideoTracks()[0];
+      if (nv) {
+        const vsender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (vsender) {
+          await vsender.replaceTrack(nv);
+        } else {
+          pc.addTrack(nv, newStream);
+        }
+      }
+      // Replace audio sender
+      const na = newStream.getAudioTracks()[0];
+      if (na) {
+        const asender = pc.getSenders().find(s => s.track?.kind === 'audio');
+        if (asender) {
+          await asender.replaceTrack(na);
+        } else {
+          pc.addTrack(na, newStream);
+        }
+      }
+    } catch (e) {
+      console.warn('applyTracksToPeers failed for', rid, e);
+    }
+  }
+}
+
+
+  camSelect.onchange = micSel.onchange = switchDevices;
+async function switchDevices() {
+  // build constraints using selected device ids if available
+  const constraints = {
+    video: camSelect.value ? { deviceId: { exact: camSelect.value } } : { facingMode: 'user' },
+    audio: micSel.value ? { deviceId: { exact: micSel.value } } : true
+  };
+
+  try {
+    // request new stream from selected devices
+    const ns = await navigator.mediaDevices.getUserMedia(constraints);
+
+    // replace senders in existing peers (or add tracks)
+    await _applyTracksToPeers(ns);
+
+    // stop old local stream
+    if (localStream) localStream.getTracks().forEach(t => { try{ t.stop(); }catch(e){} });
+
+    // set localStream to new stream and update local preview
+    localStream = ns;
+    const localVid = document.querySelector('#' + localTileId + ' video');
+    if (localVid) localVid.srcObject = localStream;
+
+    // re-apply mic/cam enabled state UI
+    applyMicCam();
+
+    // repopulate devices (labels may have changed)
+    await populateDevices();
+    showToast('Device switched', '🔁');
+  } catch (e) {
+    console.error('Could not switch device', e);
+    showToast('Could not switch device', '❌');
+  }
+}
+
+
+  // ── VIDEO GRID ──
+// --- fix updateGridLayout (replace your existing updateGridLayout) ---
+function updateGridLayout() {
+  const count = videoGrid.children.length;
+  let cols = 1;
+  if (count >= 2) cols = 2;
+  if (count >= 5) cols = 3;
+  if (count >= 10) cols = 4;
+  videoGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+}
+
+function ensureLocalTile() {
+  if (document.getElementById(localTileId)) return;
+  const tile = document.createElement('div');
+  tile.className = 'video-tile tile-local';
+  tile.id = localTileId;
+  const v = document.createElement('video');
+  v.autoplay = true; v.muted = true; v.playsInline = true;
+  if (localStream) v.srcObject = localStream;
+  const lbl = document.createElement('div');
+  lbl.className = 'tile-label'; lbl.textContent = 'You';
+  tile.appendChild(v); tile.appendChild(lbl);
+  videoGrid.insertBefore(tile, videoGrid.firstChild);
+  updateGridLayout();
+}
+
+
+  function ensureRemoteTile(remoteId, stream) {
+    const tid = 'tile-' + remoteId;
+    let tile = document.getElementById(tid);
+    if (tile) {
+      const v = tile.querySelector('video');
+      if (v && v.srcObject !== stream) v.srcObject = stream;
+      return;
+    }
+    tile = document.createElement('div');
+    tile.className = 'video-tile';
+    tile.id = tid;
+    const v = document.createElement('video');
+    v.autoplay = true; v.playsInline = true;
+    v.srcObject = stream;
+    v.volume = masterVol;
+    const lbl = document.createElement('div');
+    lbl.className = 'tile-label'; lbl.textContent = remoteId;
+    tile.appendChild(v); tile.appendChild(lbl);
+    videoGrid.appendChild(tile);
+    updateGridLayout();
+    log('Added tile for ' + remoteId);
+  }
+
+  function removeTile(remoteId) {
+    const tile = document.getElementById('tile-' + remoteId);
+    if (tile) tile.remove();
+    updateGridLayout();
+  }
+
+  // ── MIC / CAM TOGGLE ──
+function applyMicCam() {
+  if (!localStream) {
+    // toggle UI only (no stream yet)
+    document.getElementById('micToggle').classList.toggle('off', !micOn);
+    document.getElementById('camToggle').classList.toggle('off', !camOn);
+    return;
+  }
+  localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+  document.getElementById('micToggle').classList.toggle('off', !micOn);
+  document.getElementById('camToggle').classList.toggle('off', !camOn);
+  const lv = document.querySelector('#' + localTileId + ' video');
+  if (lv) lv.style.filter = camOn ? '' : 'brightness(0)';
+}
+
+  document.getElementById('micToggle').onclick = () => { micOn = !micOn; applyMicCam(); showToast(micOn?'Microphone on':'Microphone muted', micOn?'🎤':'🔇'); };
+  document.getElementById('camToggle').onclick = () => { camOn = !camOn; applyMicCam(); showToast(camOn?'Camera on':'Camera off', camOn?'📷':'📷'); };
+
+  // ── VOLUME ──
+  const volBtn = document.getElementById('volBtn');
+  const volPopup = document.getElementById('volPopup');
+  const masterVolSlider = document.getElementById('masterVol');
+  volBtn.onclick = (e) => { e.stopPropagation(); volPopup.style.display = volPopup.style.display==='block'?'none':'block'; };
+  document.addEventListener('click', () => { volPopup.style.display='none'; });
+  masterVolSlider.oninput = () => {
+    masterVol = parseFloat(masterVolSlider.value);
+    document.querySelectorAll('.video-tile:not(.tile-local) video').forEach(v => v.volume = masterVol);
+  };
+
+  // ── LOG TOGGLE ──
+  document.getElementById('logToggle').onclick = () => callLog.classList.toggle('show');
+
+  // ── COPY ID ──
+  document.getElementById('copyIdBtn').onclick = () => {
+    if (roomId) { navigator.clipboard.writeText(roomId).then(()=>showToast('Room ID copied!','📋')); }
+  };
+
+  // ── FIRESTORE PATHS ──
+  const participantsColl = r => collection(db, 'calls', r, 'participants');
+  const signalsColl = r => collection(db, 'calls', r, 'signals');
+  const roomsColl = () => collection(db, 'rooms');
+
+  // ── ROOMS LIST (home screen) ──
+  function startRoomsListener() {
+    if (roomsUnsub) return;
+    // Listen to all rooms created in last 2h
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const q = query(roomsColl(), orderBy('createdAt', 'desc'), limit(30));
+    roomsUnsub = onSnapshot(q, snap => {
+      renderRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }
+
+  function stopRoomsListener() {
+    if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+  }
+
+  function renderRooms(rooms) {
+    // Filter: rooms that had a participant in last 10 min OR < 5 min old
+    const now = Date.now();
+    const active = rooms.filter(r => {
+      if (!r.createdAt) return false;
+      const age = now - r.createdAt.toMillis();
+      return age < 2 * 60 * 60 * 1000; // under 2h
+    });
+    if (active.length === 0) {
+      roomsGrid.innerHTML = `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>
+        No active rooms yet. Create one!
+      </div>`;
+      return;
+    }
+    roomsGrid.innerHTML = active.map(r => {
+      const letter = (r.name || r.id)[0].toUpperCase();
+      const age = r.createdAt ? timeSince(r.createdAt.toMillis()) : '';
+      const count = r.participantCount || 0;
+      return `<div class="room-card">
+        <div class="room-card-left">
+          <div class="room-avatar" style="background:${roomColor(r.id)}">${letter}</div>
+          <div class="room-info">
+            <div class="room-name">${escHtml(r.name || r.id)}</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="window.__joinRoom('${r.id}','${escHtml(r.name||r.id)}')">Join</button>
+      </div>`;
+    }).join('');
+  }
+
+  function roomColor(id) {
+    const colors = [
+      'linear-gradient(135deg,#5b5fff,#a05fff)',
+      'linear-gradient(135deg,#ff5b8f,#ff9f5b)',
+      'linear-gradient(135deg,#00c6fb,#005bea)',
+      'linear-gradient(135deg,#43e97b,#38f9d7)',
+      'linear-gradient(135deg,#fa709a,#fee140)',
+    ];
+    let h = 0; for (const c of id) h = (h*31 + c.charCodeAt(0)) % colors.length;
+    return colors[h];
+  }
+
+  function timeSince(ms) {
+    const s = Math.floor((Date.now()-ms)/1000);
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    return `${Math.floor(s/3600)}h ago`;
+  }
+
+  function escHtml(s){ return (s+'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  window.__joinRoom = (id, name) => joinRoom(id, name);
+
+  // ── PEER CONNECTIONS ──
+  function createPeer(remoteId) {
+    if (peerMap[remoteId]) return peerMap[remoteId];
+    const pc = new RTCPeerConnection(rtcConfig);
+    const isPolite = clientId > remoteId;
+    const peer = { pc, makingOffer: false, isPolite, pendingCandidates: [] };
+    peerMap[remoteId] = peer;
+
+    if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    const remoteStream = new MediaStream();
+    remoteStreamMap[remoteId] = remoteStream;
+
+    pc.ontrack = ev => {
+      (ev.streams?.[0]?.getTracks() ?? [ev.track]).forEach(t => remoteStream.addTrack(t));
+      ensureRemoteTile(remoteId, remoteStream);
+    };
+
+    pc.onicecandidate = ev => {
+      if (ev.candidate) sendSignal('ice', remoteId, { candidate: ev.candidate.toJSON() });
+    };
+
+    pc.onnegotiationneeded = async () => {
+      try {
+        peer.makingOffer = true;
+        const offer = await pc.createOffer();
+        if (pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
+        await sendSignal('offer', remoteId, { sdp: pc.localDescription });
+        log(`onnegotiationneeded: offer → ${remoteId}`);
+      } catch(e) { console.warn('onnegotiationneeded', e); }
+      finally { peer.makingOffer = false; }
+    };
+
+    pc.onconnectionstatechange = () => {
+      log(`peer(${remoteId}) ${pc.connectionState}`);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') closePeer(remoteId);
+    };
+
+    log(`Created peer ${remoteId} (polite=${isPolite})`);
+    return peer;
+  }
+
+  async function closePeer(remoteId) {
+    const peer = peerMap[remoteId];
+    if (!peer) return;
+    try { peer.pc.close(); } catch(e){}
+    delete peerMap[remoteId];
+    const rs = remoteStreamMap[remoteId];
+    if (rs) { rs.getTracks().forEach(t => { try{t.stop()}catch(e){} }); delete remoteStreamMap[remoteId]; }
+    removeTile(remoteId);
+    knownParticipants.delete(remoteId);
+    log('Closed peer ' + remoteId);
+  }
+
+  // ── SIGNALS ──
+  async function sendSignal(type, to, body) {
+    if (!roomId) return;
+    const payload = {
+      from: clientId, to, type,
+      body: body ? { ...body, ...(body.sdp ? { sdp: { type: body.sdp.type, sdp: body.sdp.sdp } } : {}) } : null,
+      ts: serverTimestamp()
+    };
+    try { await addDoc(signalsColl(roomId), payload); }
+    catch(e) { log('sendSignal failed: ' + e); }
+  }
+
+  function startSignalsListener() {
+    const q = query(signalsColl(roomId), where('to','==',clientId));
+    signalsUnsub = onSnapshot(q, async snap => {
+      for (const change of snap.docChanges()) {
+        if (change.type !== 'added') continue;
+        const ref = change.doc.ref, d = change.doc.data();
+        if (!d || d.from === clientId) { try{await deleteDoc(ref);}catch(e){}; continue; }
+        const { from, type, body } = d;
+        log(`← ${type} from ${from}`);
+        try {
+          const peer = createPeer(from);
+          const pc = peer.pc;
+          if (type === 'offer') {
+            const collision = peer.makingOffer || pc.signalingState !== 'stable';
+            if (!peer.isPolite && collision) { try{await deleteDoc(ref);}catch(e){}; continue; }
+            if (collision) {
+              await Promise.all([pc.setLocalDescription({type:'rollback'}), pc.setRemoteDescription(new RTCSessionDescription(body.sdp))]);
+            } else {
+              await pc.setRemoteDescription(new RTCSessionDescription(body.sdp));
+            }
+            for (const c of peer.pendingCandidates) { try{await pc.addIceCandidate(new RTCIceCandidate(c));}catch(e){} }
+            peer.pendingCandidates = [];
+            const ans = await pc.createAnswer();
+            await pc.setLocalDescription(ans);
+            await sendSignal('answer', from, { sdp: pc.localDescription });
+          } else if (type === 'answer') {
+            if (pc.signalingState === 'have-local-offer') {
+              await pc.setRemoteDescription(new RTCSessionDescription(body.sdp));
+              for (const c of peer.pendingCandidates) { try{await pc.addIceCandidate(new RTCIceCandidate(c));}catch(e){} }
+              peer.pendingCandidates = [];
+            }
+          } else if (type === 'ice') {
+            if (pc.remoteDescription?.type) { try{await pc.addIceCandidate(new RTCIceCandidate(body.candidate));}catch(e){} }
+            else peer.pendingCandidates.push(body.candidate);
+          } else if (type === 'leave') {
+            await closePeer(from);
+          }
+        } catch(e) { log('signal error: ' + e); }
+        try { await deleteDoc(ref); } catch(e){}
+      }
+    }, err => log('signals error: ' + err));
+  }
+
+// --- updated startParticipantsListener ---
+// Replaces your existing startParticipantsListener implementation
+function startParticipantsListener() {
+  const pcol = participantsColl(roomId);
+  // Ensure we only create one listener
+  if (participantsUnsub) return;
+
+  participantsUnsub = onSnapshot(pcol, async snap => {
+    const now = Date.now();
+    const active = new Set();
+    const staleDocs = [];
+
+    // Determine which docs are active vs stale
+    for (const d of snap.docs) {
+      const id = d.id;
+      const data = d.data() || {};
+      const lastSeen = data.lastSeen ? data.lastSeen.toMillis() : (data.joinedAt ? data.joinedAt.toMillis() : 0);
+      if (lastSeen && (now - lastSeen) <= STALE_TTL_MS) {
+        active.add(id);
+      } else {
+        // consider stale candidate (we won't immediately trust deletion privileges)
+        staleDocs.push(d);
+      }
+    }
+
+    // Close peers for anyone we have a peer for but is not active
+    for (const rid of Object.keys(peerMap)) {
+      if (!active.has(rid)) {
+        log('Participant missing or stale: ' + rid + ' → closing peer');
+        await closePeer(rid);
+      }
+    }
+
+    if (!isInRoom) {
+      // nothing else to do if we are not currently in-room
+      return;
+    }
+
+    // For each new active participant, create peer if we don't have one
+    for (const id of active) {
+      if (id === clientId) continue;
+      if (knownParticipants.has(id)) continue;
+      knownParticipants.add(id);
+      const peer = createPeer(id);
+      log('New participant (active): ' + id + ' — sending offer');
+      if (!peer.makingOffer) {
+        peer.makingOffer = true;
+        try {
+          const offer = await peer.pc.createOffer();
+          if (peer.pc.signalingState !== 'stable') {
+            peer.makingOffer = false;
+            continue;
+          }
+          await peer.pc.setLocalDescription(offer);
+          await sendSignal('offer', id, { sdp: peer.pc.localDescription });
+        } catch (e) {
+          log('offer error: ' + e);
+        } finally {
+          peer.makingOffer = false;
+        }
+      }
+    }
+
+    // Update participantCount based on active set
+    try {
+      await setDoc(doc(roomsColl(), roomId), { participantCount: active.size }, { merge: true });
+    } catch (e) {
+      console.warn('update participantCount failed', e);
+    }
+
+    // Try to remove stale docs (best-effort). We don't wait on these; they may fail due to rules.
+    for (const d of staleDocs) {
+      if (d.id === clientId) continue;
+      // If this client sees the doc as stale, attempt best-effort deletion.
+      try {
+        await deleteDoc(d.ref);
+        log('Deleted stale participant doc (on snapshot): ' + d.id);
+      } catch (e) {
+        // ignore errors — other clients still treat them as stale
+      }
+    }
+  }, err => {
+    log('participants error: ' + err);
+  });
+
+  // start periodic cleanup (in case snapshot misses something)
+  if (participantsCleanupTimer) clearInterval(participantsCleanupTimer);
+  participantsCleanupTimer = setInterval(cleanupStaleParticipants, Math.max(HEARTBEAT_INTERVAL_MS, 10000));
+}
+
+function stopParticipantsListener() {
+  if (participantsUnsub) { participantsUnsub(); participantsUnsub = null; }
+}
+
+// JOIN ROOM: fully updated to acquire local media and attach to peers
+async function joinRoom(id, name) {
+  roomId = id;
+  roomName = name || id;
+  topbarRoomId.textContent = roomId;
+  showScreen('call');
+  ensureLocalTile();
+
+  // Acquire local stream (tries video+audio then video-only fallback)
+  try {
+    const s = await acquireLocalStream({ preferAudio: true });
+    // Attach to local tile video element
+    const localVid = document.querySelector('#' + localTileId + ' video');
+    if (localVid) localVid.srcObject = s;
+
+    // populate devices now that we have permission and labels
+    await populateDevices();
+
+    // apply current mic/cam toggles
+    applyMicCam();
+
+    // Replace/add tracks on existing RTCPeerConnections (if any)
+    await _applyTracksToPeers(s);
+  } catch (err) {
+    // If acquiring media failed entirely, show a clear UI message but still join (optional)
+    console.error('Could not acquire local media', err);
+    showToast('Could not access camera (check site & OS settings)', '❌');
+  }
+
+  stopRoomsListener();
+
+  try {
+    // Create or update our participant doc with joinedAt + lastSeen
+    await setDoc(doc(participantsColl(roomId), clientId), {
+      joinedAt: serverTimestamp(),
+      lastSeen: serverTimestamp(),
+      displayName: clientId
+    }, { merge: true });
+  } catch(e) {
+    log('set participant: ' + e);
+  }
+
+  isInRoom = true;
+
+  // start heartbeat and listeners
+  startHeartbeat();
+  startSignalsListener();
+  startParticipantsListener();
+
+  log(`Joined ${roomId} as ${clientId}`);
+  showToast(`Joined: ${roomName}`, '🟢');
+}
+
+// LEAVE ROOM: ensure local stream is stopped and cleanup happens
+async function leaveRoom() {
+  if (!roomId) return;
+  log('Leaving room');
+
+  // Notify peers via leave signals (best-effort)
+  try {
+    const snap = await getDocs(participantsColl(roomId));
+    for (const p of snap.docs) {
+      if (p.id !== clientId) {
+        try { await sendSignal('leave', p.id, {}); } catch(e){}
+      }
+    }
+  } catch(e){}
+
+  // Remove self from participants (best-effort)
+  try {
+    await deleteDoc(doc(participantsColl(roomId), clientId));
+  } catch(e) {
+    console.warn('delete participant failed on leave', e);
+  }
+
+  // Clean up our signals
+  await cleanupMySignals();
+
+  // If room empty then delete room data
+  try {
+    const remaining = await getDocs(participantsColl(roomId));
+    if (remaining.empty) {
+      await deleteRoomAndAllData(roomId);
+    } else {
+      // compute active participants count (use lastSeen filter)
+      const now = Date.now();
+      let activeCount = 0;
+      for (const d of remaining.docs) {
+        const data = d.data();
+        const lastSeen = data?.lastSeen ? data.lastSeen.toMillis() : (data?.joinedAt ? data.joinedAt.toMillis() : 0);
+        if (lastSeen && (now - lastSeen) <= STALE_TTL_MS) activeCount++;
+      }
+      await setDoc(doc(roomsColl(), roomId), { participantCount: activeCount }, { merge: true });
+    }
+  } catch(e) {
+    console.warn('leave room update error', e);
+  }
+
+  // Close peers
+  for (const rid of Object.keys(peerMap)) {
+    try { await closePeer(rid); } catch(e){}
+  }
+
+  // Stop listeners and timers
+  if (participantsUnsub) { participantsUnsub(); participantsUnsub = null; }
+  if (signalsUnsub) { signalsUnsub(); signalsUnsub = null; }
+  if (participantsCleanupTimer) { clearInterval(participantsCleanupTimer); participantsCleanupTimer = null; }
+  stopHeartbeat();
+
+  // Stop local stream
+  stopLocalStream();
+
+  knownParticipants.clear();
+  videoGrid.innerHTML = '';
+  isInRoom = false;
+  roomId = null;
+  roomName = null;
+  showScreen('home');
+  startRoomsListener();
+  showToast('Left the call', '👋');
+}
+
+  async function cleanupMySignals() {
+    if (!roomId) return;
+    try {
+      const q1 = query(signalsColl(roomId), where('from','==',clientId));
+      const q2 = query(signalsColl(roomId), where('to','==',clientId));
+      const [s1, s2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+      await Promise.all([...s1.docs, ...s2.docs].map(d => deleteDoc(d.ref)));
+    } catch(e) { log('cleanupMySignals: ' + e); }
+  }
+
+  async function deleteRoomAndAllData(rid) {
+    try {
+      // Delete participants
+      const ps = await getDocs(participantsColl(rid));
+      await Promise.all(ps.docs.map(d=>deleteDoc(d.ref)));
+      // Delete signals
+      const sigs = await getDocs(signalsColl(rid));
+      await Promise.all(sigs.docs.map(d=>deleteDoc(d.ref)));
+      // Delete room doc
+      await deleteDoc(doc(roomsColl(), rid));
+      log('Room fully deleted: ' + rid);
+    } catch(e) { log('deleteRoom error: ' + e); }
+  }
+
+  // ── HOME ACTIONS ──
+  document.getElementById('newRoomBtn').onclick = () => {
+    document.getElementById('newRoomModal').classList.add('open');
+    document.getElementById('roomNameInput').focus();
+  };
+  document.getElementById('cancelNewRoom').onclick = () => {
+    document.getElementById('newRoomModal').classList.remove('open');
+  };
+  document.getElementById('confirmNewRoom').onclick = async () => {
+    const name = document.getElementById('roomNameInput').value.trim() || 'Room ' + makeId(4);
+    document.getElementById('newRoomModal').classList.remove('open');
+    const rid = makeId(8);
+    // Register room in Firestore
+    try {
+      await setDoc(doc(roomsColl(), rid), {
+        name,
+        createdAt: serverTimestamp(),
+        createdBy: clientId,
+        participantCount: 0
+      });
+    } catch(e) { log('createRoom doc: ' + e); }
+    document.getElementById('roomNameInput').value = '';
+    await joinRoom(rid, name);
+  };
+
+  document.getElementById('roomNameInput').onkeydown = e => {
+    if (e.key === 'Enter') document.getElementById('confirmNewRoom').click();
+  };
+
+  document.getElementById('joinBtn').onclick = async () => {
+    const id = document.getElementById('joinInput').value.trim();
+    if (!id) { showToast('Enter a room ID', '⚠️'); return; }
+    // Look up room name
+    let name = id;
+    try {
+      const rdoc = await getDoc(doc(roomsColl(), id));
+      if (rdoc.exists()) name = rdoc.data().name || id;
+    } catch(e){}
+    document.getElementById('joinInput').value = '';
+    await joinRoom(id, name);
+  };
+
+  document.getElementById('joinInput').onkeydown = e => {
+    if (e.key === 'Enter') document.getElementById('joinBtn').click();
+  };
+
+  document.getElementById('refreshBtn').onclick = () => {
+    roomsGrid.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/></svg>Refreshing…</div>`;
+    if (roomsUnsub) { roomsUnsub(); roomsUnsub = null; }
+    startRoomsListener();
+  };
+
+  document.getElementById('leaveBtn').onclick = leaveRoom;
+
+ // --- window unload behavior (replace your beforeunload block) ---
+// still best-effort — browsers limit async on unload. We call leaveRoom() but don't await.
+// keep a short navigator.sendBeacon fallback to notify serverless endpoints if you have one.
+window.addEventListener('beforeunload', () => {
+  if (isInRoom) {
+    // Best-effort synchronous-like hint. leaveRoom is async so it may not finish,
+    // but heartbeat/stale logic and cleanup will handle the rest.
+    try { leaveRoom(); } catch(e) {}
+    // If you had a server-side endpoint that supports sendBeacon you could notify it here:
+    // navigator.sendBeacon('/client-left', JSON.stringify({ roomId, clientId }));
+  }
+});
+
+  // ── BOOT ──
+  showScreen('home');
+  startRoomsListener();
+</script>
+</body>
+</html>
