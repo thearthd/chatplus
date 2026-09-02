@@ -755,7 +755,7 @@ const SEND_DELAY_MS=1000;
 const LAST_SEND_KEY='chatplus_last_send_v2';
 const READ_MAP_KEY='chatplus_readmap_v2';
 const GIF_FAVS_KEY='chatplus_gif_favs_v2';
-const TENOR_KEY='LIVDSRZULELA';
+const KLIPY_KEY='XMG24IwooIaTxsqt14DrJZEQJ51ApsALdBtyk9jC4ZBWPuMVgK2uGpjqWPD7QXuT';
 const GROUP_WINDOW_MS=15*60*1000;
 const CUSTOM_COLORS_KEY='chatplus_custom_colors_v2';
 const WALLPAPER_KEY='chatplus_wallpaper_v2';
@@ -794,8 +794,29 @@ function loadReadMap(){try{return JSON.parse(localStorage.getItem(READ_MAP_KEY)|
 function saveReadMap(m){try{localStorage.setItem(READ_MAP_KEY,JSON.stringify(m));}catch(e){}}
 function parseMsgTs(m){try{const t=m&&m.ts;if(typeof t==='number'&&isFinite(t))return Math.floor(t);if(typeof t==='string'&&/^\d+$/.test(t))return Number(t);return 0;}catch{return 0;}}
 function isBigEmoji(text){if(!text)return false;const t=text.trim();if(!t)return false;const wo=t.replace(/(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}|\p{Emoji_Modifier}|\u200d|[\uFE00-\uFEFF])/gu,'').trim();if(wo.length>0)return false;const em=t.match(/\p{Emoji_Presentation}/gu)||[];return em.length>=1&&em.length<=3;}
-function isGifUrl(u){if(!u)return false;return/\.gif$/i.test(u.split('?')[0])||/giphy\.com|tenor\.com/i.test(u)||u.startsWith('data:image/gif');}
-function isImageUrl(u){if(!u)return false;const p=u.split('?')[0].toLowerCase();return/\.(gif|png|jpg|jpeg|webp|avif|bmp|svg)$/i.test(p)||/giphy\.com|tenor\.com|i\.imgur\.com/i.test(u)||u.startsWith('data:image');}
+function isGifUrl(u) {
+    if (!u) return false;
+
+    const clean = u.split('?')[0].toLowerCase();
+
+    return (
+        /\.gif$/i.test(clean) ||
+        /giphy\.com|klipy\.com|static\.klipy\.com/i.test(u) ||
+        u.startsWith('data:image/gif')
+    );
+}
+
+function isImageUrl(u) {
+    if (!u) return false;
+
+    const p = u.split('?')[0].toLowerCase();
+
+    return (
+        /\.(gif|png|jpg|jpeg|webp|avif|bmp|svg)$/i.test(p) ||
+        /giphy\.com|klipy\.com|static\.klipy\.com|i\.imgur\.com/i.test(u) ||
+        u.startsWith('data:image')
+    );
+}
 function isVideoUrl(u){if(!u)return false;const p=u.split('?')[0].toLowerCase();return/\.(mp4|webm|ogg|mov|avi)$/i.test(p)||u.startsWith('data:video');}
 function isNearBottom(el,t=150){if(!el)return true;return(el.scrollHeight-el.scrollTop-el.clientHeight)<=t;}
 function scrollToBot(el){if(el)el.scrollTop=el.scrollHeight;}
@@ -1221,16 +1242,65 @@ function toggleGifFavById(id,url,preview){
   if(i>=0){f.splice(i,1);saveGifFavs(f);return false;}
   else{f.unshift({id,url,preview:preview||url});if(f.length>60)f.length=60;saveGifFavs(f);return true;}
 }
-// For GIFs from picker (Tenor): use tenor item id
-function toggleTenorFav(gid,url,preview){return toggleGifFavById(gid,url,preview);}
-function isTenorFaved(gid){return isGifFavedById(gid);}
-// For sent images/GIFs in messages: use stable URL hash
+
 function toggleSentImgFav(url){const id=gifUrlId(url);return toggleGifFavById(id,url,url);}
 function isSentImgFaved(url){return isGifFavedById(gifUrlId(url));}
 
-// ── TENOR ──
-async function fetchTenor(q='',limit=24){const ep=q.trim().length?'search':'trending';const url=`https://g.tenor.com/v1/${ep}?key=${encodeURIComponent(TENOR_KEY)}&limit=${limit}&media_filter=minimal&q=${encodeURIComponent(q)}`;try{const r=await fetch(url);if(!r.ok)throw new Error(r.status);const d=await r.json();return d&&d.results?d.results:[];}catch{return[];}}
-function getGifUrl(item){try{if(item.media&&item.media[0]){const m=item.media[0];if(m.gif?.url)return m.gif.url;if(m.tinygif?.url)return m.tinygif.url;}if(item.url)return item.url;}catch{}return null;}
+
+// ── KLIPY GIF API ──
+async function fetchKlipy(q='', limit=24) {
+    const params = new URLSearchParams({
+        key: KLIPY_KEY,
+        q: q || 'trending',
+        media_filter: 'gif,tinygif',
+        limit: String(Math.min(limit, 50)),
+        country: 'US',
+        locale: 'en_US',
+        contentfilter: 'medium'
+    });
+
+    try {
+        const r = await fetch(`https://api.klipy.com/v2/search?${params}`);
+
+        if (!r.ok) {
+            throw new Error(`Klipy API error: ${r.status}`);
+        }
+
+        const d = await r.json();
+
+        return Array.isArray(d?.results) ? d.results : [];
+    } catch (e) {
+        console.error('Klipy GIF fetch failed:', e);
+        return [];
+    }
+}
+
+function getGifUrl(item) {
+    try {
+        return (
+            item?.media_formats?.gif?.url ||
+            item?.media_formats?.tinygif?.url ||
+            item?.media_formats?.mediumgif?.url ||
+            null
+        );
+    } catch {
+        return null;
+    }
+}
+
+function getGifPreview(item) {
+    try {
+        return (
+            item?.media_formats?.tinygif?.url ||
+            item?.media_formats?.mediumgif?.url ||
+            item?.media_formats?.gif?.url ||
+            null
+        );
+    } catch {
+        return null;
+    }
+}
+
 
 // ── IMAGE COMPRESS ──
 function imgToDataURL(file,maxW=800,q=0.72){return new Promise((res,rej)=>{try{const r=new FileReader();r.onerror=rej;r.onload=()=>{const img=new Image();img.onerror=rej;img.onload=()=>{const scale=Math.min(1,maxW/img.width);const w=Math.round(img.width*scale),h=Math.round(img.height*scale);const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);function hasAlpha(){try{const d=ctx.getImageData(0,0,w,h).data;for(let i=3;i<d.length;i+=4)if(d[i]!==255)return true;return false;}catch{return file.type==='image/png';}}res(hasAlpha()?c.toDataURL('image/png'):c.toDataURL('image/jpeg',q));};img.src=r.result;};r.readAsDataURL(file);}catch(e){rej(e);}});}
@@ -2207,7 +2277,7 @@ function _onKeydown(e){
 let gifPopup=null;
 async function openGifPicker(anchorEl){
   closeGifPicker();gifPopup=document.createElement('div');gifPopup.className='gif-picker-popup';
-  gifPopup.innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="gif-favs-strip" id="gifFavsStrip"></div><div style="display:flex;flex:1;gap:8px;"><input id="gifSearchInput" class="modal-input" placeholder="Search GIFs…" style="margin:0;flex:1;"/><button class="send-btn" id="gifSearchBtn" style="height:36px;">Search</button></div><button class="input-btn" id="gifTrendBtn">Trending</button><button class="input-btn" id="gifCloseBtn">✕</button></div><div class="gif-grid" id="gifGrid"></div>`;
+  gifPopup.innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="gif-favs-strip" id="gifFavsStrip"></div><div style="display:flex;flex:1;gap:8px;"><input id="gifSearchInput" class="modal-input" placeholder="Search KLIPY…" style="margin:0;flex:1;"/><button class="send-btn" id="gifSearchBtn" style="height:36px;">Search</button></div><button class="input-btn" id="gifTrendBtn">Trending</button><button class="input-btn" id="gifCloseBtn">✕</button></div><div class="gif-grid" id="gifGrid"></div>`;
   document.body.appendChild(gifPopup);
   const w=Math.min(760,window.innerWidth*0.96);const h=window.innerHeight*0.6;
   let left=Math.max(4,Math.min(window.innerWidth/2-w/2,window.innerWidth-w-8));let top=Math.max(16,window.innerHeight-h-80);
@@ -2247,32 +2317,80 @@ star.addEventListener('click',ev=>{
     t.appendChild(star);el.appendChild(t);
   });
 }
-async function loadGifResults(query){
-  if(!gifPopup)return;const grid=gifPopup.querySelector('#gifGrid');if(!grid)return;
-  grid.innerHTML='<div style="padding:18px;color:var(--text-muted)">Loading…</div>';
-  const results=await fetchTenor(query,30);
-  if(!results.length){grid.innerHTML='<div style="padding:18px;color:var(--text-muted)">No results</div>';return;}
-  grid.innerHTML='';
-  results.forEach(item=>{
-    const gid=item.id||'';
-    const url=getGifUrl(item)||'';
-    const preview=(item.media?.[0]?.tinygif?.url)||url;
-    const thumb=document.createElement('div');thumb.className='gif-thumb';
-    const img=document.createElement('img');img.src=preview;img.alt=item.title||'gif';img.loading='lazy';thumb.appendChild(img);
-    // FIX: each GIF uses its own Tenor item ID, not a global flag
-    const faved=isTenorFaved(gid);
-    const star=document.createElement('div');star.className='gif-fav-star'+(faved?' favorited':'');star.innerHTML=faved?'★':'☆';
-    star.addEventListener('click',ev=>{
-      ev.stopPropagation();
-      const b=toggleTenorFav(gid,url,preview);
-      star.classList.toggle('favorited',b);star.innerHTML=b?'★':'☆';
-      renderGifFavsStrip();
+
+async function loadGifResults(query) {
+    if (!gifPopup) return;
+
+    const grid = gifPopup.querySelector('#gifGrid');
+    if (!grid) return;
+
+    grid.innerHTML =
+        '<div style="padding:18px;color:var(--text-muted)">Loading…</div>';
+
+    const results = await fetchKlipy(query, 30);
+
+    if (!results.length) {
+        grid.innerHTML =
+            '<div style="padding:18px;color:var(--text-muted)">No results</div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+
+    results.forEach(item => {
+        const gid = String(item.id || '');
+        const url = getGifUrl(item) || '';
+        const preview = getGifPreview(item) || url;
+
+        if (!url) return;
+
+        const thumb = document.createElement('div');
+        thumb.className = 'gif-thumb';
+
+        const img = document.createElement('img');
+        img.src = preview;
+        img.alt = item.title || 'gif';
+        img.loading = 'lazy';
+
+        thumb.appendChild(img);
+
+        // Favorite state
+        const faved = isGifFavedById(gid);
+
+        const star = document.createElement('div');
+        star.className =
+            'gif-fav-star' + (faved ? ' favorited' : '');
+        star.innerHTML = faved ? '★' : '☆';
+
+        star.addEventListener('click', ev => {
+            ev.stopPropagation();
+
+            const nowFaved =
+                toggleGifFavById(gid, url, preview);
+
+            star.classList.toggle('favorited', nowFaved);
+            star.innerHTML = nowFaved ? '★' : '☆';
+
+            renderGifFavsStrip();
+        });
+
+        thumb.appendChild(star);
+
+        // Send GIF
+        thumb.addEventListener('click', ev => {
+            ev.stopPropagation();
+
+            if (!url) return;
+
+            sendMessageToActiveThread('', url);
+            closeGifPicker();
+        });
+
+        grid.appendChild(thumb);
     });
-    thumb.appendChild(star);
-    thumb.addEventListener('click',ev=>{ev.stopPropagation();if(!url)return;sendMessageToActiveThread('',url);closeGifPicker();});
-    grid.appendChild(thumb);
-  });
 }
+
+
 
 // ── CONTEXT MENUS ──
 function closeCtxMenu(){const m=document.getElementById('ctxMenu');if(m)m.remove();}
