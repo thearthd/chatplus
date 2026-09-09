@@ -1172,7 +1172,9 @@ try{
         // ONLY condition: is the tab currently hidden? Nothing about active thread.
         if(document.hidden){
           const senderName=resolveDisplayName(msg.uid);
+          const previewText = msg.image ? '📷 Image' : (msg.text || '').slice(0, 100);
           startTabAlert(`💬 ${senderName}`);
+          alert(`New message from ${senderName}:\n${previewText}`);
         }
       });
     });
