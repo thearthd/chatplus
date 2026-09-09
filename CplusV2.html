@@ -700,6 +700,12 @@ em-emoji-picker{--background-rgb:43,45,49;--rgb-accent:88,101,242;--border-radiu
     <input id="adminRetractUser" type="text" class="modal-input" placeholder="Username…"/>
     <button class="modal-btn modal-btn-secondary" style="width:100%;margin-top:6px;" onclick="adminRetractTimeout()">Retract Timeout</button>
   </div>
+<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+  <label>Change/Reset PFP</label>
+  <input id="adminPfpUser" type="text" class="modal-input" placeholder="Username…"/>
+  <input id="adminPfpUrl" type="text" class="modal-input" placeholder="Image URL or blank to reset…"/>
+  <button class="modal-btn modal-btn-secondary" style="width:100%;margin-top:6px;" onclick="adminChangePfp()">Set / Reset PFP</button>
+</div>
   <div id="adminMsg" style="font-size:13px;margin-top:8px;"></div>
 </div>
 <!-- Owner panel -->
@@ -726,6 +732,13 @@ em-emoji-picker{--background-rgb:43,45,49;--rgb-accent:88,101,242;--border-radiu
     <input id="ownerDeleteUser" type="text" class="modal-input" placeholder="Username to delete…"/>
     <button class="modal-btn modal-btn-danger" style="width:100%;" onclick="ownerDeleteUser()">Delete Account</button>
   </div>
+<!-- ADD inside #ownerPanel, after the delete user section -->
+<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+  <label>Change User PFP (owner/mod)</label>
+  <input id="ownerPfpUser" type="text" class="modal-input" placeholder="Username…"/>
+  <input id="ownerPfpUrl" type="text" class="modal-input" placeholder="Image URL or leave blank to reset…"/>
+  <button class="modal-btn modal-btn-secondary" style="width:100%;margin-top:6px;" onclick="staffChangePfp()">Set / Reset PFP</button>
+</div>
   <div id="ownerMsg" style="font-size:13px;margin-top:8px;"></div>
 </div>
 <script type="module">
@@ -1162,14 +1175,82 @@ function recomputeAllUnread(tree){
   });}
   unreadMap=nm;renderBadges();
 }
-function renderBadges(){
-  const cur=loadUser();
-  const cont=document.getElementById('dmListContainer');
-  if(cont){Array.from(cont.children).forEach(c=>{const fuid=c.dataset.friendUid;if(!fuid)return;const myUid=cur?.uid||'';const tid=threadIdDM(myUid,fuid);const cnt=unreadMap[tid]||0;let b=c.querySelector('.dm-unread-badge');if(cnt>0){if(!b){b=document.createElement('div');b.className='dm-unread-badge unread-badge';b.style.cssText='margin-left:4px;min-width:20px;text-align:center;padding:2px 6px;font-size:12px;font-weight:700;flex-shrink:0;';c.appendChild(b);}b.textContent=cnt>99?'99+':cnt;}else{if(b)b.remove();}});}
-  const grpC=document.getElementById('groupListContainer');
-  if(grpC){Array.from(grpC.children).forEach(c=>{const gid=c.dataset.groupId;if(!gid)return;const tid=threadIdGroup(gid);const cnt=unreadMap[tid]||0;let b=c.querySelector('.dm-unread-badge');if(cnt>0){if(!b){b=document.createElement('div');b.className='dm-unread-badge unread-badge';b.style.cssText='margin-left:4px;min-width:20px;text-align:center;padding:2px 6px;font-size:12px;font-weight:700;flex-shrink:0;';c.appendChild(b);}b.textContent=cnt>99?'99+':cnt;}else{if(b)b.remove();}});}
-  document.querySelectorAll('.channel-item').forEach(el=>{const ch=el.dataset.channel||'';if(!ch)return;const tid=threadIdChan(ch);const cnt=unreadMap[tid]||0;let b=el.querySelector('.ch-badge');if(cnt>0){if(!b){b=document.createElement('span');b.className='ch-badge unread-badge';b.style.cssText='margin-left:8px;';el.appendChild(b);}b.textContent=cnt>99?'99+':cnt;}else{if(b)b.remove();}});
-  const navFR=document.getElementById('navFR');const frCnt=Object.keys(incomingFRs||{}).length;if(navFR){let b=navFR.querySelector('.nav-unread-badge');if(frCnt>0){if(!b){b=document.createElement('span');b.className='nav-unread-badge unread-badge';b.style.cssText='position:absolute;right:4px;top:4px;min-width:18px;text-align:center;padding:2px 5px;font-size:11px;font-weight:700;';navFR.appendChild(b);}b.textContent=frCnt>99?'99+':frCnt;}else{if(b)b.remove();}}
+// REPLACE: function renderBadges(){ ... }
+
+function renderBadges() {
+  const cur = loadUser();
+
+  // DM badges
+  const cont = document.getElementById('dmListContainer');
+  if (cont) {
+    Array.from(cont.children).forEach(c => {
+      const fuid = c.dataset.friendUid; if (!fuid) return;
+      const myUid = cur?.uid || '';
+      const tid = threadIdDM(myUid, fuid);
+      const cnt = unreadMap[tid] || 0;
+      let b = c.querySelector('.dm-unread-badge');
+      if (cnt > 0) {
+        if (!b) { b = document.createElement('div'); b.className = 'dm-unread-badge unread-badge'; b.style.cssText = 'margin-left:4px;min-width:20px;text-align:center;padding:2px 6px;font-size:12px;font-weight:700;flex-shrink:0;'; c.appendChild(b); }
+        b.textContent = cnt > 99 ? '99+' : cnt;
+      } else { if (b) b.remove(); }
+    });
+  }
+
+  // Group badges
+  const grpC = document.getElementById('groupListContainer');
+  if (grpC) {
+    Array.from(grpC.children).forEach(c => {
+      const gid = c.dataset.groupId; if (!gid) return;
+      const tid = threadIdGroup(gid);
+      const cnt = unreadMap[tid] || 0;
+      let b = c.querySelector('.dm-unread-badge');
+      if (cnt > 0) {
+        if (!b) { b = document.createElement('div'); b.className = 'dm-unread-badge unread-badge'; b.style.cssText = 'margin-left:4px;min-width:20px;text-align:center;padding:2px 6px;font-size:12px;font-weight:700;flex-shrink:0;'; c.appendChild(b); }
+        b.textContent = cnt > 99 ? '99+' : cnt;
+      } else { if (b) b.remove(); }
+    });
+  }
+
+  // Channel item badges
+  document.querySelectorAll('.channel-item').forEach(el => {
+    const ch = el.dataset.channel || ''; if (!ch) return;
+    const tid = threadIdChan(ch);
+    const cnt = unreadMap[tid] || 0;
+    let b = el.querySelector('.ch-badge');
+    if (cnt > 0) {
+      if (!b) { b = document.createElement('span'); b.className = 'ch-badge unread-badge'; b.style.cssText = 'margin-left:8px;'; el.appendChild(b); }
+      b.textContent = cnt > 99 ? '99+' : cnt;
+    } else { if (b) b.remove(); }
+  });
+
+  // ── Server nav button badge (sum of ALL channel unreads) ──
+  const navServer = document.getElementById('navServer');
+  if (navServer) {
+    const serverTotal = Object.keys(unreadMap)
+      .filter(tid => tid.startsWith('channel_'))
+      .reduce((sum, tid) => sum + (unreadMap[tid] || 0), 0);
+    let b = navServer.querySelector('.nav-unread-badge');
+    if (serverTotal > 0) {
+      if (!b) {
+        b = document.createElement('span');
+        b.className = 'nav-unread-badge unread-badge';
+        b.style.cssText = 'position:absolute;right:4px;top:4px;min-width:18px;text-align:center;padding:2px 5px;font-size:11px;font-weight:700;z-index:2;';
+        navServer.appendChild(b);
+      }
+      b.textContent = serverTotal > 99 ? '99+' : serverTotal;
+    } else { if (b) b.remove(); }
+  }
+
+  // Friend request badge on navFR
+  const navFR = document.getElementById('navFR');
+  const frCnt = Object.keys(incomingFRs || {}).length;
+  if (navFR) {
+    let b = navFR.querySelector('.nav-unread-badge');
+    if (frCnt > 0) {
+      if (!b) { b = document.createElement('span'); b.className = 'nav-unread-badge unread-badge'; b.style.cssText = 'position:absolute;right:4px;top:4px;min-width:18px;text-align:center;padding:2px 5px;font-size:11px;font-weight:700;'; navFR.appendChild(b); }
+      b.textContent = frCnt > 99 ? '99+' : frCnt;
+    } else { if (b) b.remove(); }
+  }
 }
 
 // ── GLOBAL MSG LISTENER (security: only notify threads user belongs to) ──
@@ -1379,17 +1460,60 @@ function updateUIForUser(username,uid){
 
 // ── PRESENCE ──
 let myPresRef=null,presInterval=null;
-async function startPresence(uid,username){
-  if(!uid)return;
-  myPresRef=ref(db,'onlineUsers/'+uid);
-  await set(myPresRef,{username,uid,lastActive:serverTimestamp(),session:randSession()});
-  try{onDisconnect(myPresRef).remove();}catch(e){}
-  if(presInterval)clearInterval(presInterval);
-  presInterval=setInterval(()=>{try{set(myPresRef,{username,uid,lastActive:serverTimestamp()});}catch(e){}},5000);
-  attachGlobalListeners();checkAdminOwnerStatus(uid);
-}
-function stopPresence(){try{if(myPresRef)remove(myPresRef);}catch(e){}if(presInterval)clearInterval(presInterval);myPresRef=null;presInterval=null;}
+async function startPresence(uid, username) {
+  if (!uid) return;
 
+  myPresRef = ref(db, 'onlineUsers/' + uid);
+
+  await set(myPresRef, {
+    username,
+    uid,
+    lastActive: serverTimestamp(),
+    session: randSession()
+  });
+
+  try {
+    onDisconnect(myPresRef).remove();
+  } catch (e) {}
+
+  if (presInterval) {
+    clearInterval(presInterval);
+  }
+
+  presInterval = setInterval(() => {
+    try {
+      set(myPresRef, {
+        username,
+        uid,
+        lastActive: serverTimestamp()
+      });
+    } catch (e) {}
+  }, 5000);
+
+  attachGlobalListeners();
+
+  // Start the stale-typing cleanup system.
+  startTypingJanitor();
+
+  checkAdminOwnerStatus(uid);
+}
+function stopPresence() {
+  try {
+    if (myPresRef) {
+      remove(myPresRef);
+    }
+  } catch (e) {}
+
+  if (presInterval) {
+    clearInterval(presInterval);
+  }
+
+  presInterval = null;
+  myPresRef = null;
+
+  // Stop stale typing cleanup.
+  stopTypingJanitor();
+}
 // ── ADMIN/OWNER ──
 async function checkAdminOwnerStatus(uid){
   try{
@@ -1399,6 +1523,39 @@ async function checkAdminOwnerStatus(uid){
 }
 window.toggleAdminPanel=function(){if(timeoutLockActive)return;const p=document.getElementById('adminPanel'),o=document.getElementById('adminPanelOverlay');const shown=p.style.display!=='none';p.style.display=shown?'none':'block';o.style.display=shown?'none':'block';};
 window.closeAdminPanel=function(){document.getElementById('adminPanel').style.display='none';document.getElementById('adminPanelOverlay').style.display='none';};
+// ADD after window.closeAdminPanel definition
+
+// Staff role cache
+let myStaffRole = null; // 'owner', 'admin', 'mod', or null
+
+async function checkStaffRole(uid) {
+  try {
+    const [ownerSnap, adminSnap, modSnap] = await Promise.all([
+      get(ref(db, 'owners/' + uid)),
+      get(ref(db, 'admins/' + uid)),
+      get(ref(db, 'mods/' + uid))
+    ]);
+    if (ownerSnap.exists() && ownerSnap.val()) myStaffRole = 'owner';
+    else if (adminSnap.exists() && adminSnap.val()) myStaffRole = 'admin';
+    else if (modSnap.exists() && modSnap.val()) myStaffRole = 'mod';
+    else myStaffRole = null;
+
+    // Show/hide nav buttons
+    document.getElementById('navAdmin').style.display = (myStaffRole === 'admin') ? 'flex' : 'none';
+    document.getElementById('navOwner').style.display = (myStaffRole === 'owner') ? 'flex' : 'none';
+
+    // Live-listen for changes
+    onValue(ref(db, 'owners/' + uid), s => {
+      if (s.exists() && s.val()) { myStaffRole = 'owner'; document.getElementById('navOwner').style.display = 'flex'; document.getElementById('navAdmin').style.display = 'none'; }
+    });
+    onValue(ref(db, 'admins/' + uid), s => {
+      if (s.exists() && s.val() && myStaffRole !== 'owner') { myStaffRole = 'admin'; document.getElementById('navAdmin').style.display = 'flex'; }
+    });
+    onValue(ref(db, 'mods/' + uid), s => {
+      if (s.exists() && s.val() && !myStaffRole) myStaffRole = 'mod';
+    });
+  } catch (e) {}
+}
 window.applyTimeout=async function(){
   const username=(document.getElementById('adminTimeoutUser').value||'').trim();
   let secs=Number(document.getElementById('adminTimeoutSlider').value)||60;
@@ -1481,6 +1638,37 @@ const updates={};
   }catch(e){document.getElementById('ownerMsg').textContent='Failed: '+e.message;}
 };
 
+// ADD after window.ownerDeleteUser
+
+window.staffChangePfp = async function() {
+  const username = (document.getElementById('ownerPfpUser')?.value || '').trim();
+  const url = (document.getElementById('ownerPfpUrl')?.value || '').trim();
+  const msgEl = document.getElementById('ownerMsg');
+  if (!username) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Enter a username.'; } return; }
+  try {
+    const uid = await lookupUidByUsername(username);
+    if (!uid) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'User not found.'; } return; }
+    await update(ref(db), { ['users/' + uid + '/avatar']: url || null });
+    if (msgEl) { msgEl.style.color = 'var(--green)'; msgEl.textContent = url ? `PFP updated for ${username}.` : `PFP reset for ${username}.`; }
+    if (document.getElementById('ownerPfpUser')) document.getElementById('ownerPfpUser').value = '';
+    if (document.getElementById('ownerPfpUrl')) document.getElementById('ownerPfpUrl').value = '';
+  } catch (e) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Failed: ' + e.message; } }
+};
+
+// ADD a mod-panel variant that uses adminMsg
+window.adminChangePfp = async function() {
+  const username = (document.getElementById('adminPfpUser')?.value || '').trim();
+  const url = (document.getElementById('adminPfpUrl')?.value || '').trim();
+  const msgEl = document.getElementById('adminMsg');
+  if (!username) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Enter a username.'; } return; }
+  try {
+    const uid = await lookupUidByUsername(username);
+    if (!uid) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'User not found.'; } return; }
+    await update(ref(db), { ['users/' + uid + '/avatar']: url || null });
+    if (msgEl) { msgEl.style.color = 'var(--green)'; msgEl.textContent = url ? `PFP updated for ${username}.` : `PFP reset for ${username}.`; }
+  } catch (e) { if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = 'Failed: ' + e.message; } }
+};
+
 // ── GUEST LANDING ──
 function buildGuestLanding(isGuest){
   const chatArea=document.getElementById('chatArea');
@@ -1556,10 +1744,295 @@ function extractMentions(text){if(!text)return[];const s=new Set();try{text.repl
 function textHasMention(text,username){if(!text||!username)return false;const esc=escRx(username);return new RegExp('@\\['+esc+'\\]','i').test(text)||new RegExp('@'+esc+'\\b','i').test(text);}
 
 // ── TYPING ──
-function setTyping(state){try{const cur=loadUser();if(!cur?.uid)return;const path='chat/typing/'+(activeThreadId||'global')+'/'+cur.uid;const TR=ref(db,path);if(state){set(TR,true);if(typingTimer)clearTimeout(typingTimer);typingTimer=setTimeout(()=>{set(TR,false).catch(()=>{});typingTimer=null;},2000);}else{set(TR,false).catch(()=>{});if(typingTimer){clearTimeout(typingTimer);typingTimer=null;}}}catch(e){}}
-function buildTypingText(obj){try{if(!obj||typeof obj!=='object')return'';const cur=loadUser();const myUid=cur?.uid||null;const typers=Object.keys(obj).filter(k=>{if(k===myUid)return false;const v=obj[k];return v===true||v==='true';});if(!typers.length)return'';const names=typers.map(k=>resolveDisplayName(k)||k).slice(0,3);if(names.length===1)return`${names[0]} is typing…`;return`${names[0]} & ${names[1]} are typing…`;}catch{return'';}}
-function subscribeTyping(threadId){if(typeof typingUnsub==='function'){try{typingUnsub();}catch(e){}typingUnsub=null;}if(!threadId)return;typingUnsub=onValue(ref(db,'chat/typing/'+threadId),snap=>{const val=snap.exists()?snap.val():{};const text=buildTypingText(val);const ind=document.getElementById('typingIndicatorBar');if(ind)ind.textContent=text||'';});}
 
+const TYPING_EXPIRE_MS = 15000;
+const TYPING_JANITOR_MS = 5000;
+
+let typingGlobalSnap = {};
+let typingGlobalUnsub = null;
+let typingJanitorInterval = null;
+
+function setTyping(state) {
+  try {
+    const cur = loadUser();
+    if (!cur?.uid || !activeThreadId) return;
+
+    const path = 'chat/typing/' + activeThreadId + '/' + cur.uid;
+    const TR = ref(db, path);
+
+    if (state) {
+      // Keep the normal "typing" flag.
+      set(TR, true).catch(() => {});
+
+      // Local safety timeout.
+      if (typingTimer) clearTimeout(typingTimer);
+
+      typingTimer = setTimeout(() => {
+        set(TR, null).catch(() => {});
+        typingTimer = null;
+      }, 2000);
+
+    } else {
+      set(TR, null).catch(() => {});
+
+      if (typingTimer) {
+        clearTimeout(typingTimer);
+        typingTimer = null;
+      }
+    }
+
+  } catch (e) {}
+}
+
+
+function buildTypingText(obj) {
+  try {
+    if (!obj || typeof obj !== 'object') return '';
+
+    const cur = loadUser();
+    const myUid = cur?.uid || null;
+    const active = [];
+
+    Object.keys(obj).forEach(uid => {
+      if (uid === myUid) return;
+
+      const value = obj[uid];
+
+      // Only actual typing flags count.
+      if (value !== true && value !== 'true') return;
+
+      const onlineEntry = onlineSnap && onlineSnap[uid];
+
+      if (!onlineEntry) {
+        // No presence entry = definitely offline.
+        return;
+      }
+
+      const lastActive =
+        typeof onlineEntry.lastActive === 'number'
+          ? onlineEntry.lastActive
+          : 0;
+
+      if (!lastActive) return;
+
+      // Only show users whose presence heartbeat is still fresh.
+      if ((Date.now() - lastActive) > TYPING_EXPIRE_MS) {
+        return;
+      }
+
+      active.push(uid);
+    });
+
+    if (!active.length) return '';
+
+    const names = active
+      .map(uid => resolveDisplayName(uid) || uid)
+      .slice(0, 3);
+
+    if (names.length === 1) {
+      return `${names[0]} is typing…`;
+    }
+
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]} are typing…`;
+    }
+
+    return `${names[0]}, ${names[1]} and others are typing…`;
+
+  } catch (e) {
+    return '';
+  }
+}
+
+
+/*
+ * Picks exactly one online client to act as the typing cleanup host.
+ *
+ * The first UID alphabetically becomes the host.
+ *
+ * This is better than random selection because every client
+ * independently picks the same host, so you don't get several
+ * clients fighting over the job.
+ */
+function getTypingJanitorHost() {
+  try {
+    const online = onlineSnap || {};
+    const now = Date.now();
+
+    const onlineUids = Object.keys(online)
+      .filter(uid => {
+        const entry = online[uid];
+        if (!entry) return false;
+
+        const lastActive =
+          typeof entry.lastActive === 'number'
+            ? entry.lastActive
+            : 0;
+
+        return lastActive > 0 &&
+               (now - lastActive) <= TYPING_EXPIRE_MS;
+      })
+      .sort();
+
+    return onlineUids.length ? onlineUids[0] : null;
+
+  } catch (e) {
+    return null;
+  }
+}
+
+
+/*
+ * Cleans stale typing flags from EVERY thread.
+ *
+ * This runs independently from the individual typing listener,
+ * which fixes the original problem where nothing changed after
+ * somebody disconnected.
+ */
+async function cleanupStaleTyping() {
+  try {
+    const cur = loadUser();
+    if (!cur?.uid) return;
+
+    // Only the elected host performs cleanup.
+    const hostUid = getTypingJanitorHost();
+
+    if (hostUid !== cur.uid) return;
+
+    const now = Date.now();
+    const root = typingGlobalSnap || {};
+
+    for (const threadId of Object.keys(root)) {
+      const threadTyping = root[threadId];
+
+      if (!threadTyping || typeof threadTyping !== 'object') {
+        continue;
+      }
+
+      for (const uid of Object.keys(threadTyping)) {
+        const value = threadTyping[uid];
+
+        if (value !== true && value !== 'true') {
+          continue;
+        }
+
+        // Nobody online = stale.
+        const onlineEntry = onlineSnap && onlineSnap[uid];
+
+        if (!onlineEntry) {
+          try {
+            await set(
+              ref(db, 'chat/typing/' + threadId + '/' + uid),
+              null
+            );
+          } catch (e) {}
+
+          continue;
+        }
+
+        const lastActive =
+          typeof onlineEntry.lastActive === 'number'
+            ? onlineEntry.lastActive
+            : 0;
+
+        // Presence heartbeat stopped.
+        if (!lastActive || (now - lastActive) > TYPING_EXPIRE_MS) {
+          try {
+            await set(
+              ref(db, 'chat/typing/' + threadId + '/' + uid),
+              null
+            );
+          } catch (e) {}
+        }
+      }
+    }
+
+  } catch (e) {}
+}
+
+
+/*
+ * Start the global typing watcher and janitor.
+ *
+ * This only starts once.
+ */
+function startTypingJanitor() {
+  try {
+    if (typeof typingGlobalUnsub === 'function') {
+      try {
+        typingGlobalUnsub();
+      } catch (e) {}
+      typingGlobalUnsub = null;
+    }
+
+    typingGlobalUnsub = onValue(
+      ref(db, 'chat/typing'),
+      snap => {
+        typingGlobalSnap = snap.exists() ? snap.val() : {};
+      }
+    );
+
+    if (typingJanitorInterval) {
+      clearInterval(typingJanitorInterval);
+    }
+
+    typingJanitorInterval = setInterval(() => {
+      cleanupStaleTyping();
+    }, TYPING_JANITOR_MS);
+
+    // Run once immediately.
+    cleanupStaleTyping();
+
+  } catch (e) {}
+}
+
+
+/*
+ * Stop the janitor when the user signs out.
+ */
+function stopTypingJanitor() {
+  try {
+    if (typeof typingGlobalUnsub === 'function') {
+      typingGlobalUnsub();
+    }
+  } catch (e) {}
+
+  typingGlobalUnsub = null;
+  typingGlobalSnap = {};
+
+  if (typingJanitorInterval) {
+    clearInterval(typingJanitorInterval);
+    typingJanitorInterval = null;
+  }
+}
+
+
+function subscribeTyping(threadId) {
+  if (typeof typingUnsub === 'function') {
+    try {
+      typingUnsub();
+    } catch (e) {}
+
+    typingUnsub = null;
+  }
+
+  if (!threadId) return;
+
+  typingUnsub = onValue(
+    ref(db, 'chat/typing/' + threadId),
+    snap => {
+      const val = snap.exists() ? snap.val() : {};
+
+      const text = buildTypingText(val);
+
+      const ind = document.getElementById('typingIndicatorBar');
+
+      if (ind) {
+        ind.textContent = text || '';
+      }
+    }
+  );
+}
 // ── CHANNEL PERMISSIONS ──
 try{onValue(ref(db,'channelPermissions'),snap=>{channelPermsSnap=snap.exists()?snap.val():{};});}catch(e){}
 async function checkChanPerm(threadId,uid){if(!threadId||!threadId.startsWith('channel_'))return true;const ch=threadId.replace('channel_','');const perms=channelPermsSnap[ch];if(!perms||!Object.keys(perms).length)return true;return!!(uid&&perms[uid]);}
@@ -1643,6 +2116,9 @@ async function sendMessageToActiveThread(text,image,skipRateLimit=false){
   const inp=document.getElementById('activeMessageInput');
   const localId=randSession();
   // Clear input immediately, then show pending
+  // Capture reply BEFORE clearing it
+  const capturedReply = window._pendingReplyTo || null;
+
   if(inp){inp.value='';_autoResize(inp);}
   clearAttachedPreview();
   if(typeof window.cancelReply==='function')window.cancelReply();
@@ -1650,7 +2126,7 @@ async function sendMessageToActiveThread(text,image,skipRateLimit=false){
   addPendingMsg(localId,sendText,image);
   const payload={uid:cur.uid,username:cur.username,text:String(sendText||''),ts:serverTimestamp(),mentions:extractMentions(sendText)};
   if(image)payload.image=image;
-  if(window._pendingReplyTo){payload.replyTo=window._pendingReplyTo;window._pendingReplyTo=null;}
+  if(capturedReply){payload.replyTo=capturedReply;}
   try{
     if(!skipRateLimit)setLastSend(now);
     setTyping(false);
@@ -1954,17 +2430,74 @@ function renderAllMessagesWithChunkNav(allMsgs,chunkStart){
 }
 
 // ── MEDIA PANEL ──
-function toggleMediaPanel(){
-  mediaVisible=!mediaVisible;let mp=document.getElementById('mediaPanel');
-  if(!mediaVisible){if(mp)mp.remove();return;}
-  if(!mp){mp=document.createElement('div');mp.className='media-panel';mp.id='mediaPanel';const mc=document.getElementById('mainContent');if(mc){mc.style.position='relative';mc.appendChild(mp);}}
-  mp.innerHTML=`<div class="media-panel-header"><span>🖼️ Media</span><button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;" onclick="toggleMediaPanel()">✕</button></div><div class="media-grid" id="mediaGrid"></div>`;
-  const grid=document.getElementById('mediaGrid');if(!grid)return;
-  const mediaItems=threadMessages.filter(m=>m.image||(m.text&&(isImageUrl(m.text)||isVideoUrl(m.text))));
-  if(!mediaItems.length){grid.innerHTML='<div style="padding:16px;text-align:center;color:var(--text-muted);grid-column:1/-1;">No media in this conversation</div>';return;}
-  mediaItems.forEach(msg=>{const src=msg.image||(isImageUrl(msg.text)?msg.text:msg.text);const isVid=!msg.image&&isVideoUrl(msg.text);const item=document.createElement('div');item.className='media-grid-item';if(isVid){const vid=document.createElement('video');vid.src=src;vid.muted=true;item.appendChild(vid);}else{const img=document.createElement('img');img.src=src;img.loading='lazy';item.appendChild(img);}item.addEventListener('click',()=>openLightbox(src,isVid));grid.appendChild(item);});
+// REPLACE: function toggleMediaPanel(){ ... }
+
+async function toggleMediaPanel() {
+  mediaVisible = !mediaVisible;
+  let mp = document.getElementById('mediaPanel');
+  if (!mediaVisible) { if (mp) mp.remove(); return; }
+  if (!mp) {
+    mp = document.createElement('div');
+    mp.className = 'media-panel';
+    mp.id = 'mediaPanel';
+    const mc = document.getElementById('mainContent');
+    if (mc) { mc.style.position = 'relative'; mc.appendChild(mp); }
+  }
+  mp.innerHTML = `<div class="media-panel-header"><span>🖼️ Media</span><button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;" onclick="toggleMediaPanel()">✕</button></div><div style="padding:8px 16px;font-size:12px;color:var(--text-muted);">Loading all media…</div><div class="media-grid" id="mediaGrid"></div>`;
+
+  if (!activeThreadId) return;
+
+  try {
+    const snap = await get(ref(db, 'chat/messages/' + activeThreadId));
+    const grid = document.getElementById('mediaGrid');
+    if (!grid) return;
+
+    if (!snap.exists()) {
+      grid.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);grid-column:1/-1;">No media in this conversation</div>';
+      return;
+    }
+
+    const val = snap.val();
+    const mediaItems = [];
+    Object.keys(val).forEach(k => {
+      const m = val[k];
+      if (!m) return;
+      const src = m.image || (m.text && (isImageUrl(m.text) || isVideoUrl(m.text)) ? m.text : null);
+      if (src) mediaItems.push({ src, isVid: isVideoUrl(src), ts: m.ts || 0 });
+    });
+    mediaItems.sort((a, b) => b.ts - a.ts);
+
+    // Update header count
+    const header = mp.querySelector('.media-panel-header span');
+    if (header) header.textContent = `🖼️ Media (${mediaItems.length})`;
+
+    if (!mediaItems.length) {
+      grid.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);grid-column:1/-1;">No media in this conversation</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    mediaItems.forEach(({ src, isVid }) => {
+      const item = document.createElement('div');
+      item.className = 'media-grid-item';
+      if (isVid) {
+        const vid = document.createElement('video');
+        vid.src = src; vid.muted = true;
+        item.appendChild(vid);
+      } else {
+        const img = document.createElement('img');
+        img.src = src; img.loading = 'lazy';
+        item.appendChild(img);
+      }
+      item.addEventListener('click', () => openLightbox(src, isVid));
+      grid.appendChild(item);
+    });
+  } catch (e) {
+    const grid = document.getElementById('mediaGrid');
+    if (grid) grid.innerHTML = `<div style="padding:16px;color:var(--text-muted);grid-column:1/-1;">Failed to load: ${escHtml(e.message)}</div>`;
+  }
 }
-window.toggleMediaPanel=toggleMediaPanel;window.toggleSearchPanel=toggleSearchPanel;
+window.toggleMediaPanel = toggleMediaPanel;
 
 // ── PAGINATION ──
 async function loadMoreMessages(threadId){
@@ -2039,10 +2572,33 @@ if(isSystem){
     pinBtn.addEventListener('click',ev=>{ev.stopPropagation();pinMessage(activeThreadId,msg.key,{uid:whoUid,username:who,text:msg.text||'',image:msg.image||null});});
     actionsBar.appendChild(replyBtn);actionsBar.appendChild(reactBtn);actionsBar.appendChild(pinBtn);
     const cur=loadUser();
-    if(cur?.uid&&whoUid===cur.uid){
-      const editBtn=document.createElement('button');editBtn.className='msg-action-btn';editBtn.textContent='✏️';editBtn.title='Edit';editBtn.addEventListener('click',ev=>{ev.stopPropagation();editMessage(activeThreadId,msg.key,msg.text||'');});actionsBar.appendChild(editBtn);
-      const delBtn=document.createElement('button');delBtn.className='msg-action-btn danger';delBtn.textContent='🗑';delBtn.title='Delete';delBtn.addEventListener('click',ev=>{ev.stopPropagation();deleteMessage(activeThreadId,msg.key);});actionsBar.appendChild(delBtn);
-    }
+// FIND: if(cur?.uid&&whoUid===cur.uid){ ... actionsBar.appendChild(delBtn); }
+// REPLACE WITH:
+
+if (cur?.uid && whoUid === cur.uid) {
+  const editBtn = document.createElement('button');
+  editBtn.className = 'msg-action-btn'; editBtn.textContent = '✏️'; editBtn.title = 'Edit';
+  editBtn.addEventListener('click', ev => { ev.stopPropagation(); editMessage(activeThreadId, msg.key, msg.text || ''); });
+  actionsBar.appendChild(editBtn);
+  const delBtn = document.createElement('button');
+  delBtn.className = 'msg-action-btn danger'; delBtn.textContent = '🗑'; delBtn.title = 'Delete';
+  delBtn.addEventListener('click', ev => { ev.stopPropagation(); deleteMessage(activeThreadId, msg.key); });
+  actionsBar.appendChild(delBtn);
+} else if (myStaffRole === 'owner' || myStaffRole === 'admin' || myStaffRole === 'mod') {
+  // Staff can delete any message
+  const staffDelBtn = document.createElement('button');
+  staffDelBtn.className = 'msg-action-btn danger'; staffDelBtn.textContent = '🛡🗑'; staffDelBtn.title = 'Staff: Delete';
+  staffDelBtn.addEventListener('click', async ev => {
+    ev.stopPropagation();
+    if (!confirm('Delete this message as staff?')) return;
+    try {
+      const dom = document.querySelector(`.message[data-msgkey="${CSS.escape(msg.key)}"]`);
+      if (dom) { dom.classList.add('message-deleting'); setTimeout(() => { try { dom.remove(); } catch (e) {} }, 260); }
+      await remove(ref(db, 'chat/messages/' + activeThreadId + '/' + msg.key));
+    } catch { alert('Failed to delete.'); }
+  });
+  actionsBar.appendChild(staffDelBtn);
+}
     msgEl.appendChild(actionsBar);
 
     if(isGrouped){const gt=document.createElement('span');gt.className='grouped-time';gt.textContent=timeShort;msgEl.appendChild(gt);}
@@ -2051,19 +2607,38 @@ if(isSystem){
     const contentEl=document.createElement('div');contentEl.className='message-content';
 
     // Reply quote
-    if(msg.replyTo){try{
-      const reply=msg.replyTo;
-      const replyUid=reply.uid||null;
-      const replyName=replyUid?resolveDisplayName(replyUid,reply.username):(reply.username||'');
-      const avUrl=replyUid?getAvatarForUid(replyUid):null;
-      const avBg=avUrl?`background-image:url('${avUrl}');background-size:cover;`:'';
-      const avTxt=avUrl?'':escHtml((replyName||'').slice(0,2).toUpperCase());
-      const preview=reply.image?'📷 Image':escHtml((reply.text||'').slice(0,100));
-      const quoteEl=document.createElement('div');quoteEl.className='message-reply-quote';
-      quoteEl.innerHTML=`<div class="message-reply-quote-avatar" style="${avBg}">${avTxt}</div><div class="message-reply-quote-content"><div class="message-reply-quote-author">${escHtml(replyName)}</div><div class="message-reply-quote-text">${preview||'<em style="opacity:.6">Original</em>'}</div></div>`;
-      quoteEl.addEventListener('click',ev=>{ev.stopPropagation();if(!reply.key)return;const orig=ml.querySelector(`.message[data-msgkey="${CSS.escape(reply.key)}"]`);if(orig){orig.scrollIntoView({behavior:'smooth',block:'center'});orig.style.background='rgba(88,101,242,.18)';setTimeout(()=>{orig.style.background='';},1400);}});
-      contentEl.appendChild(quoteEl);
-    }catch(e){}}
+// REPLACE the entire: if(msg.replyTo){try{ ... }catch(e){}} block
+
+if (msg.replyTo) {
+  try {
+    const reply = msg.replyTo;
+    const replyUid = reply.uid || null;
+    const replyName = replyUid
+      ? resolveDisplayName(replyUid, reply.username)
+      : (reply.username || 'Unknown');
+    const avUrl = replyUid ? getAvatarForUid(replyUid) : null;
+    const avBg = avUrl ? `background-image:url('${avUrl}');background-size:cover;` : `background:${accentColor(replyName)};`;
+    const avTxt = avUrl ? '' : escHtml((replyName || '').slice(0, 2).toUpperCase());
+    const preview = reply.image === '[image]' ? '📷 Image'
+      : reply.image ? '📷 Image'
+      : escHtml((reply.text || '').slice(0, 100));
+    const quoteEl = document.createElement('div');
+    quoteEl.className = 'message-reply-quote';
+    quoteEl.innerHTML = `<div class="message-reply-quote-avatar" style="${avBg}display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700;">${avTxt}</div><div class="message-reply-quote-content"><div class="message-reply-quote-author">${escHtml(replyName)}</div><div class="message-reply-quote-text">${preview || '<em style="opacity:.6">Original message</em>'}</div></div>`;
+    quoteEl.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const targetKey = reply.key;
+      if (!targetKey) return;
+      const orig = ml.querySelector(`.message[data-msgkey="${CSS.escape(targetKey)}"]`);
+      if (orig) {
+        orig.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        orig.style.background = 'rgba(88,101,242,.18)';
+        setTimeout(() => { orig.style.background = ''; }, 1400);
+      }
+    });
+    contentEl.appendChild(quoteEl);
+  } catch (e) {}
+}
 
     if(!isGrouped){
       const headerEl=document.createElement('div');headerEl.className='message-header';
@@ -2086,18 +2661,38 @@ if(isSystem){
     if(msg.edited&&isGrouped){const et=document.createElement('span');et.className='edited-tag';et.textContent='(edited)';textEl.appendChild(et);}
     contentEl.appendChild(textEl);
 
-    if(msg.image){
-      if(isVideoUrl(msg.image)){
-        const vid=document.createElement('video');vid.src=msg.image;vid.controls=true;vid.className='message-video';vid.addEventListener('click',ev=>ev.stopPropagation());contentEl.appendChild(vid);
-      }else{
-        const wrapper=document.createElement('div');wrapper.className='message-image-wrapper';
-        const imgEl=document.createElement('img');imgEl.src=msg.image;imgEl.className='message-image';imgEl.alt='image';imgEl.loading='lazy';imgEl.addEventListener('click',()=>openLightbox(msg.image,false));wrapper.appendChild(imgEl);
-        const faved=isSentImgFaved(msg.image);
-        const favBtn=document.createElement('div');favBtn.className='msg-gif-fav-btn'+(faved?' favorited':'');favBtn.innerHTML=faved?'★':'☆';favBtn.title='Favorite';
-        favBtn.addEventListener('click',ev=>{ev.stopPropagation();const b=toggleSentImgFav(msg.image);favBtn.classList.toggle('favorited',b);favBtn.innerHTML=b?'★':'☆';});
-        wrapper.appendChild(favBtn);contentEl.appendChild(wrapper);
-      }
+// REPLACE: if(msg.image){ if(isVideoUrl ... } else { const wrapper ... } }
+
+if (msg.image) {
+  if (isVideoUrl(msg.image)) {
+    const vid = document.createElement('video');
+    vid.src = msg.image; vid.controls = true; vid.className = 'message-video';
+    vid.addEventListener('click', ev => ev.stopPropagation());
+    contentEl.appendChild(vid);
+  } else {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-image-wrapper';
+    const imgEl = document.createElement('img');
+    imgEl.src = msg.image; imgEl.className = 'message-image'; imgEl.alt = 'image'; imgEl.loading = 'lazy';
+    imgEl.addEventListener('click', () => openLightbox(msg.image, false));
+    wrapper.appendChild(imgEl);
+    // Only show fav star for GIFs/external URLs, not base64 uploads
+    if (isGifUrl(msg.image) || (!msg.image.startsWith('data:'))) {
+      const faved = isSentImgFaved(msg.image);
+      const favBtn = document.createElement('div');
+      favBtn.className = 'msg-gif-fav-btn' + (faved ? ' favorited' : '');
+      favBtn.innerHTML = faved ? '★' : '☆'; favBtn.title = 'Favorite';
+      favBtn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const b = toggleSentImgFav(msg.image);
+        favBtn.classList.toggle('favorited', b);
+        favBtn.innerHTML = b ? '★' : '☆';
+      });
+      wrapper.appendChild(favBtn);
     }
+    contentEl.appendChild(wrapper);
+  }
+}
 
     const reactionsDiv=document.createElement('div');reactionsDiv.className='reactions';reactionsDiv.setAttribute('data-reactions-for',msg.key);contentEl.appendChild(reactionsDiv);
     msgEl.appendChild(contentEl);ml.appendChild(msgEl);knownMsgKeys.add(msg.key);
@@ -2120,16 +2715,35 @@ if(isSystem){
         foundAny=true;const url=match[0];const before=original.slice(lastIndex,match.index);
         if(before){const s=document.createElement('span');s.innerHTML=renderMentions(before,myUsername);frag.appendChild(s);}
         if(isVideoUrl(url)){const vid=document.createElement('video');vid.src=url;vid.controls=true;vid.className='message-video';vid.addEventListener('click',ev=>ev.stopPropagation());frag.appendChild(vid);}
-        else if(isImageUrl(url)){
-          const wrapper=document.createElement('div');wrapper.className='message-image-wrapper';
-          const imgEl=document.createElement('img');imgEl.src=url;imgEl.className='message-image';imgEl.alt='';imgEl.loading='lazy';imgEl.addEventListener('click',()=>openLightbox(url,false));
-          imgEl.addEventListener('error',()=>{const a=document.createElement('a');a.href=url;a.target='_blank';a.className='message-link';a.textContent=url;imgEl.replaceWith(a);},{once:true});
-          wrapper.appendChild(imgEl);
-          const faved=isSentImgFaved(url);
-          const fb=document.createElement('div');fb.className='msg-gif-fav-btn'+(faved?' favorited':'');fb.innerHTML=faved?'★':'☆';
-          fb.addEventListener('click',ev=>{ev.stopPropagation();const b=toggleSentImgFav(url);fb.classList.toggle('favorited',b);fb.innerHTML=b?'★':'☆';});
-          wrapper.appendChild(fb);frag.appendChild(wrapper);
-        }else{
+// REPLACE the image branch inside the URL embed while-loop:
+
+ else if (isImageUrl(url)) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message-image-wrapper';
+  const imgEl = document.createElement('img');
+  imgEl.src = url; imgEl.className = 'message-image'; imgEl.alt = ''; imgEl.loading = 'lazy';
+  imgEl.addEventListener('click', () => openLightbox(url, false));
+  imgEl.addEventListener('error', () => {
+    const a = document.createElement('a'); a.href = url; a.target = '_blank';
+    a.className = 'message-link'; a.textContent = url; imgEl.replaceWith(a);
+  }, { once: true });
+  wrapper.appendChild(imgEl);
+  // Only show fav star for GIFs/external URLs
+  if (isGifUrl(url) || (!url.startsWith('data:'))) {
+    const faved = isSentImgFaved(url);
+    const fb = document.createElement('div');
+    fb.className = 'msg-gif-fav-btn' + (faved ? ' favorited' : '');
+    fb.innerHTML = faved ? '★' : '☆';
+    fb.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const b = toggleSentImgFav(url);
+      fb.classList.toggle('favorited', b);
+      fb.innerHTML = b ? '★' : '☆';
+    });
+    wrapper.appendChild(fb);
+  }
+  frag.appendChild(wrapper);
+}else{
           const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.className='message-link';a.textContent=url;frag.appendChild(a);
           try{const card=document.createElement('div');card.className='link-embed-card';try{const u=new URL(url);card.innerHTML=`<div class="link-embed-title">${escHtml(u.hostname)}</div><div class="link-embed-url">${escHtml(url.slice(0,80))}</div>`;}catch{card.innerHTML=`<div class="link-embed-url">${escHtml(url.slice(0,80))}</div>`;}card.addEventListener('click',()=>window.open(url,'_blank'));frag.appendChild(card);}catch(e){}
         }
@@ -2912,19 +3526,33 @@ window.showFriendsList=showFriendsList;window.showServerChannels=showServerChann
 window.addEventListener('click',e=>{if(timeoutLockActive)return;if(e.target.classList&&e.target.classList.contains('modal'))closeAllModals();});
 
 // ── REPLY ──
-window.setReplyingTo=function(msgKey,author,text,image){
-  const cur=loadUser();
-  window._pendingReplyTo={key:msgKey,uid:usernameToUid[author?.toLowerCase()]||null,username:author,text:(text||'').slice(0,200),image:image?'[image]':null};
-  let bar=document.getElementById('replyBar');if(!bar)return;bar.classList.add('active');
-  const avUrl=getAvatarForUsername(author);
-  const avBg=avUrl?`background-image:url('${avUrl}');background-size:cover;background-position:center;`:'background:var(--accent);';
-  const avText=avUrl?'':escHtml((author||'').slice(0,2).toUpperCase());
-  const preview=image?'📷 Image':escHtml((text||'').slice(0,80));
-  bar.innerHTML=`<div style="width:18px;height:18px;border-radius:50%;flex-shrink:0;${avBg}display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700;">${avText}</div><span style="color:var(--text-muted);font-size:12px;">Replying to</span><span style="color:var(--accent);font-weight:700;margin-right:6px;">${escHtml(author)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:12px;opacity:.85;">${preview}</span><button class="reply-bar-cancel" onclick="cancelReply()">✕</button>`;
-  try{document.getElementById('activeMessageInput')?.focus();}catch(e){}
-};
-window.cancelReply=function(){window._pendingReplyTo=null;const bar=document.getElementById('replyBar');if(bar){bar.classList.remove('active');bar.innerHTML='';}};
+// REPLACE: window.setReplyingTo and window.cancelReply
 
+window.setReplyingTo = function(msgKey, author, text, image) {
+  const resolvedUid = usernameToUid[author?.toLowerCase()] || null;
+  window._pendingReplyTo = {
+    key: msgKey,
+    uid: resolvedUid,
+    username: author,
+    text: (text || '').slice(0, 200),
+    image: image ? '[image]' : null
+  };
+  let bar = document.getElementById('replyBar');
+  if (!bar) return;
+  bar.classList.add('active');
+  const avUrl = resolvedUid ? getAvatarForUid(resolvedUid) : getAvatarForUsername(author);
+  const avBg = avUrl ? `background-image:url('${avUrl}');background-size:cover;background-position:center;` : 'background:var(--accent);';
+  const avText = avUrl ? '' : escHtml((author || '').slice(0, 2).toUpperCase());
+  const preview = image ? '📷 Image' : escHtml((text || '').slice(0, 80));
+  bar.innerHTML = `<div style="width:18px;height:18px;border-radius:50%;flex-shrink:0;${avBg}display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700;">${avText}</div><span style="color:var(--text-muted);font-size:12px;">Replying to</span><span style="color:var(--accent);font-weight:700;margin-right:6px;">${escHtml(author)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:12px;opacity:.85;">${preview}</span><button class="reply-bar-cancel" onclick="cancelReply()">✕</button>`;
+  try { document.getElementById('activeMessageInput')?.focus(); } catch (e) {}
+};
+
+window.cancelReply = function() {
+  window._pendingReplyTo = null;
+  const bar = document.getElementById('replyBar');
+  if (bar) { bar.classList.remove('active'); bar.innerHTML = ''; }
+};
 // ── SEARCH INPUT ──
 document.getElementById('userSearchInput').addEventListener('input',e=>{const q=(e.target.value||'').toLowerCase().trim();[document.getElementById('dmListContainer'),document.getElementById('groupListContainer')].forEach(cont=>{if(!cont)return;Array.from(cont.children).forEach(c=>{const n=c.querySelector('.dm-friend-name');const nm=(n?.textContent||'').toLowerCase();c.style.display=(!q||nm.includes(q))?'':'none';});});});
 
