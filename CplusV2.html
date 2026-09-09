@@ -1133,19 +1133,111 @@ function saveToastPref(e){try{localStorage.setItem(NOTIF_TOAST_KEY,e?'1':'0');}c
 function loadDeskPref(){try{return localStorage.getItem(NOTIF_DESK_KEY)==='1';}catch{return false;}}
 function saveDeskPref(e){try{localStorage.setItem(NOTIF_DESK_KEY,e?'1':'0');}catch(err){}}
 
-function maybeNotify(msgKey,senderUid,text,image,location,msgTs,threadId){
-  const cur=loadUser();if(!cur?.uid)return;
-  if(senderUid===cur.uid)return;
-  if(typeof msgTs==='number'&&msgTs<SESSION_START)return;
-  if(knownMsgKeys.has(msgKey))return;
-  if(threadId===activeThreadId)return;
-  if(isThreadMuted(threadId))return;
-  const senderName=resolveDisplayName(senderUid);
-  const preview=image?'📷 Image':(text||'').slice(0,80);
-  const av=getAvatarForUid(senderUid);
-  if(loadToastPref())showToast(senderName,location,preview,av,threadId);
-  if(!document.hasFocus()&&loadDeskPref()&&typeof Notification!=='undefined'&&Notification.permission==='granted'){
-    try{const n=new Notification(`${senderName} — ${location}`,{body:preview,tag:msgKey,icon:av||undefined});n.onclick=()=>{window.focus();n.close();};setTimeout(()=>{try{n.close();}catch(e){}},6000);}catch(e){}
+// ── STANDALONE TAB ALERT LISTENER (independent of active-thread notify logic) ──
+let tabAlertKnownKeys = new Set();
+try{
+  onValue(ref(db,'chat/messages'),snap=>{
+    const tree=snap.exists()?snap.val():null;
+    if(!tree)return;
+    const cur=loadUser();const myUid=cur?.uid||null;
+    if(!myUid)return;
+
+    Object.keys(tree).forEach(rawTid=>{
+      const msgs=tree[rawTid]||{};
+
+      // SECURITY: only consider threads this user belongs to
+      if(rawTid.startsWith('dm_')){
+        const parts=rawTid.replace('dm_','').split('_');
+        if(!parts.includes(myUid))return;
+      } else if(rawTid.startsWith('group_')){
+        const gid=rawTid.replace('group_','');
+        const grp=groupsSnap[gid];
+        if(!grp||!grp.members||!grp.members[myUid])return;
+      }
+
+      Object.keys(msgs).forEach(mk=>{
+        const globalKey=rawTid+'::'+mk;
+        if(tabAlertKnownKeys.has(globalKey))return;
+        tabAlertKnownKeys.add(globalKey);
+
+        const msg=msgs[mk];if(!msg)return;
+        if(msg.uid===myUid)return;
+        if(msg.uid==='system'||msg.system)return;
+
+        const ts=parseMsgTs(msg);
+        if(ts<SESSION_START)return;
+
+        if(isThreadMuted(rawTid))return;
+
+        // ONLY condition: is the tab currently hidden? Nothing about active thread.
+        if(document.hidden){
+          const senderName=resolveDisplayName(msg.uid);
+          startTabAlert(`💬 ${senderName}`);
+        }
+      });
+    });
+  });
+}catch(e){}
+
+
+function maybeNotify(msgKey, senderUid, text, image, location, msgTs, threadId) {
+  const cur = loadUser();
+
+  if (!cur?.uid) return;
+  if (senderUid === cur.uid) return;
+  if (typeof msgTs === 'number' && msgTs < SESSION_START) return;
+  if (knownMsgKeys.has(msgKey)) return;
+  if (isThreadMuted(threadId)) return;
+
+  const senderName = resolveDisplayName(senderUid);
+  const preview = image ? '📷 Image' : (text || '').slice(0, 80);
+  const av = getAvatarForUid(senderUid);
+
+  // The user is actively looking at this chat in this tab.
+  const sameChat = threadId === activeThreadId;
+
+  // Toast only when NOT viewing this exact chat (unchanged behavior for toasts)
+  if (!sameChat && loadToastPref()) {
+    showToast(
+      senderName,
+      location,
+      preview,
+      av,
+      threadId
+    );
+  }
+
+  // Desktop notification only when tab is hidden AND not viewing this chat
+  if (document.hidden && !sameChat) {
+    if (
+      loadDeskPref() &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        const n = new Notification(
+          `${senderName} — ${location}`,
+          {
+            body: preview,
+            tag: msgKey,
+            icon: av || undefined
+          }
+        );
+
+        n.onclick = () => {
+          window.focus();
+          n.close();
+          stopTabAlert();
+        };
+
+        setTimeout(() => {
+          try {
+            n.close();
+          } catch (e) {}
+        }, 6000);
+
+      } catch (e) {}
+    }
   }
 }
 
@@ -1260,7 +1352,6 @@ try{
     if(tree){
       const cur=loadUser();const myUid=cur?.uid||null;
       Object.keys(tree).forEach(rawTid=>{
-        if(rawTid===activeThreadId)return;
         const msgs=tree[rawTid]||{};
 
         // SECURITY: only process threads this user belongs to
@@ -1497,6 +1588,57 @@ async function startPresence(uid, username) {
 
   checkAdminOwnerStatus(uid);
 }
+
+
+
+// ── TAB TITLE ALERT ──
+
+const CHATPLUS_DEFAULT_TITLE = 'Chat+ v2';
+
+let tabAlertInterval = null;
+let tabAlertActive = false;
+
+function startTabAlert(text = '💬 New message') {
+  // Already flashing.
+  if (tabAlertActive) return;
+
+  tabAlertActive = true;
+
+  let showAlert = true;
+
+  document.title = text;
+
+  tabAlertInterval = setInterval(() => {
+    document.title = showAlert ? text : CHATPLUS_DEFAULT_TITLE;
+    showAlert = !showAlert;
+  }, 1000);
+}
+
+function stopTabAlert() {
+  tabAlertActive = false;
+
+  if (tabAlertInterval) {
+    clearInterval(tabAlertInterval);
+    tabAlertInterval = null;
+  }
+
+  document.title = CHATPLUS_DEFAULT_TITLE;
+}
+
+// Stop the alert as soon as the user comes back.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    stopTabAlert();
+  }
+});
+
+window.addEventListener('focus', () => {
+  stopTabAlert();
+});
+
+
+
+
 function stopPresence() {
   try {
     if (myPresRef) {
@@ -2789,7 +2931,7 @@ function attachThread(threadId){
       threadMessages.sort((a,b)=>(a.ts||0)-(b.ts||0));
       const ml=document.getElementById('messagesList');const wasNearBot=ml?isNearBottom(ml,150):true;
       renderAllMessages();if(wasNearBot&&ml)scrollToBot(ml);
-const newMsgs=list.filter(m=>keyMap[m.key]===undefined&&m.uid!=='system'&&!m.system);
+const newMsgs=list.filter(m=>keyMap[m.key]===undefined&&m.uid!=='system'&&!m.system&&!knownMsgKeys.has(m.key));
       if(newMsgs.length>0){
         const lastMsg=newMsgs[newMsgs.length-1];
         let loc;if(currentGroupId&&groupsSnap[currentGroupId])loc=groupsSnap[currentGroupId].name||'Group';else if(currentDMFriendUid)loc=resolveDisplayName(currentDMFriendUid)||'DM';else loc=(activeThreadId||'').replace('channel_','#');
