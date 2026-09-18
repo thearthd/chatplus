@@ -766,7 +766,7 @@ const app=initializeApp(firebaseConfig);
 const db=getDatabase(app);
 
 // ── CONSTANTS ──
-const APP_VERSION="2.02";
+const APP_VERSION="2.1";
 const LOCAL_USER_KEY='chatplus_user_v2';
 const ACTIVE_MS=15000;
 const MAX_IMG_BYTES=8000*1024;
@@ -1882,9 +1882,31 @@ async function searchEmojiShortcodes(q){
   return out.slice(0,8);
 }
 
+// In handleEmojiInput, replace the whole function with:
 async function handleEmojiInput(e){
   const inp=e.target;const val=inp.value||'';const caret=inp.selectionStart||0;
   const before=val.slice(0,caret);
+
+  // NEW: detect a fully-typed :shortcode: and auto-replace immediately
+  const closedMatch=before.match(/(?:^|\s):([a-z0-9_+\-]{2,}):$/i);
+  if(closedMatch){
+    const code=closedMatch[1].toLowerCase();
+    const matches=await searchEmojiShortcodes(code);
+    const exact=matches.find(m=>m.id.toLowerCase()===code)||matches[0];
+    if(exact){
+      const start=caret-closedMatch[0].length+(closedMatch[0].startsWith(' ')?1:0);
+      const val2=inp.value;
+      const newVal=val2.slice(0,start)+exact.native+' '+val2.slice(caret);
+      inp.value=newVal;
+      const nc=(val2.slice(0,start)+exact.native+' ').length;
+      inp.setSelectionRange(nc,nc);
+      inp.focus();
+      closeEmojiAc();
+      inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,inp.classList.contains('edit-textarea')?120:180)+'px';
+      return;
+    }
+  }
+
   const m=before.match(/(?:^|\s):([a-z0-9_+\-]{1,})$/i);
   if(!m){closeEmojiAc();return;}
   emojiAcStart=caret-m[1].length-1;
@@ -1990,10 +2012,17 @@ function insertMention(uname,inputEl){
 function moveMention(d){const ac=document.getElementById('mentionAutoList');if(!ac)return;const items=ac.querySelectorAll('.mention-item');mentionIdx=(mentionIdx+d+items.length)%items.length;items.forEach((item,i)=>item.classList.toggle('active',i===mentionIdx));}
 function confirmMention(){const ac=document.getElementById('mentionAutoList');if(!ac)return;const items=ac.querySelectorAll('.mention-item');const ai=items[mentionIdx]||items[0];if(!ai)return;const u=ai.getAttribute('data-username');const inp=document.getElementById('activeMessageInput');if(u&&inp)insertMention(u,inp);}
 function closeMentionAuto(){mentionOpen=false;mentionIdx=0;const ac=document.getElementById('mentionAutoList');if(ac){ac.classList.remove('open');ac.innerHTML='';}}
+// In renderMentions, replace both .replace() calls:
 function renderMentions(text,myUsername){
-  if(!text)return'';let out=escHtml(text);
-  out=out.replace(/@\[((?:\\\]|[^\]])+)\]/g,(m,name)=>{const dn=escHtml(name.replace(/\\\]/g,']'));const isMe=myUsername&&name.toLowerCase()===myUsername.toLowerCase();return`<span class="mention-highlight${isMe?' mention-me':''}" data-mention="${escHtml(name)}">@${dn}`;});
-  out=out.replace(/@([^\s@\[]+)/g,(m,name)=>{const isMe=myUsername&&name.toLowerCase()===myUsername.toLowerCase();return`<span class="mention-highlight${isMe?' mention-me':''}" data-mention="${escHtml(name)}">@${escHtml(name)}</span>`;});
+  if(!text)return'';
+  const esc=escHtml(text);
+  // Single combined regex pass so bracket (@[Name]) and plain (@word) mentions
+  // can never double-match and nest inside each other's span.
+  const out=esc.replace(/@\[((?:\\\]|[^\]])+)\]|@([^\s@\[<>]+)/g,(m,bracketName,plainName)=>{
+    const name=bracketName!==undefined?bracketName.replace(/\\\]/g,']'):plainName;
+    const isMe=myUsername&&name.toLowerCase()===myUsername.toLowerCase();
+    return`<span class="mention-highlight${isMe?' mention-me':''}" data-mention="${escHtml(name)}">@${escHtml(name)}</span>`;
+  });
   return out;
 }
 function extractMentions(text){if(!text)return[];const s=new Set();try{text.replace(/@\[((?:\\\]|[^\]])+)\]/g,(_,n)=>{s.add(n.replace(/\\\]/g,']').trim());});text.replace(/@([^\s@\[]+)/g,(_,n)=>{s.add(n.trim());});}catch(e){}return Array.from(s);}
@@ -3137,16 +3166,25 @@ function attachThread(threadId){
       try{const maxTs=list.reduce((acc,m)=>{const t=typeof m.ts==='number'?m.ts:Number(m.ts||0);return t>acc?t:acc;},0);if(activeThreadId===threadId&&maxTs>0){const prev=getLastRead(threadId)||0;if(maxTs>prev)setLastRead(threadId,maxTs);}}catch(e){}
     }
   });
-  try{
-    if(childRemovedUnsub){try{childRemovedUnsub();}catch(e){}childRemovedUnsub=null;}
-    childRemovedUnsub=onChildRemoved(ref(db,'chat/messages/'+threadId),snap=>{
-      const key=snap.key;if(!key)return;
-      try{knownMsgKeys.delete(key);}catch(e){}
-      try{threadMessages=threadMessages.filter(m=>m.key!==key);}catch(e){}
-      try{const ml=document.getElementById('messagesList');if(ml){const dom=ml.querySelector(`.message[data-msgkey="${CSS.escape(key)}"]`);if(dom){dom.classList.add('message-deleting');setTimeout(()=>{try{dom.remove();}catch(e){}},220);}}}catch(e){}
-      try{recomputeUnread(threadId);}catch(e){}
-    });
-  }catch(e){}
+// In attachThread(), replace the childRemovedUnsub block with:
+try{
+  if(childRemovedUnsub){try{childRemovedUnsub();}catch(e){}childRemovedUnsub=null;}
+  childRemovedUnsub=onChildRemoved(ref(db,'chat/messages/'+threadId),snap=>{
+    const key=snap.key;if(!key)return;
+    try{knownMsgKeys.delete(key);}catch(e){}
+    try{threadMessages=threadMessages.filter(m=>m.key!==key);}catch(e){}
+    // FIX: re-render the whole list so grouping/headers recompute correctly
+    // instead of just removing the DOM node (which left orphaned grouped
+    // messages with no header, making them look appended to the wrong person)
+    try{
+      const ml=document.getElementById('messagesList');
+      const wasNearBot=ml?isNearBottom(ml,150):true;
+      renderAllMessages();
+      if(wasNearBot&&ml)scrollToBot(ml);
+    }catch(e){}
+    try{recomputeUnread(threadId);}catch(e){}
+  });
+}catch(e){}
 }
 
 // ── BUILD CHAT UI ──
